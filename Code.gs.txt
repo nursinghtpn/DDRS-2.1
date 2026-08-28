@@ -1,0 +1,1317 @@
+// ============================================================
+// DDRS - Sistem Pengurusan Dokumen
+// Versi 2.0 | Unit Kejururawatan, HTPN
+// Google Apps Script Backend
+// ============================================================
+
+// ── KONFIGURASI SHEET ──────────────────────────────────────
+const SHEET_NAME_REKOD    = 'Rekod_Dokumen';
+const SHEET_NAME_PENGGUNA = 'Pengguna';
+const SHEET_NAME_LOG      = 'Log_Pergerakan';
+const SHEET_NAME_CONFIG   = 'Konfigurasi';
+const SHEET_NAME_JENIS    = 'Jenis_Dokumen';
+
+// ── HEADER DEFINISI ────────────────────────────────────────
+const HEADERS_REKOD = [
+  'ID_Dokumen','Jenis_Dokumen','Nama_Dokumen','Nama_Penghantar','ID_Penghantar',
+  'Tarikh_Hantar','Status','Catatan_Penghantar',
+  'Nama_Penyemak','Tarikh_Semak','Tindakan_Penyemak','Catatan_Penyemak',
+  'ID_Penerima_USM','Nama_Penerima_USM',
+  'Nama_USM','Tarikh_USM','Tindakan_USM','Catatan_USM',
+  'Tarikh_Kemaskini','Unit_Penghantar'
+];
+
+const HEADERS_PENGGUNA = [
+  'ID','Nama','Kata_Laluan','Peranan','Modul_Akses','Emel','No_Tel','Jawatan','Tarikh_Kemaskini','Status_Akaun','Unit'
+];
+
+const HEADERS_LOG = [
+  'Log_ID','ID_Dokumen','Nama_Dokumen','Pengguna','Peranan','Tindakan','Catatan','Tarikh_Masa'
+];
+
+const HEADERS_CONFIG = ['Kunci','Nilai'];
+
+// ── STATUS WORKFLOW ────────────────────────────────────────
+const STATUS = {
+  DIHANTAR:    'Dihantar',
+  DISEMAK:     'Disemak',
+  QUERY:       'Query',
+  QUERY_USM:   'Query USM',
+  KE_USM:      'Dihantar ke USM',
+  DITERIMA_USM:'Diterima oleh USM',
+  DITOLAK_USM: 'Ditolak oleh USM',
+  SELESAI:     'Selesai'
+};
+
+// ============================================================
+// ENTRY POINT - doGet
+// ============================================================
+function doGet() {
+  autoSetupDatabase();
+  return HtmlService.createHtmlOutputFromFile('Index')
+    .setTitle('DDRS - Sistem Pengurusan Dokumen')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+// ============================================================
+// SETUP MANUAL — Jalankan dari Apps Script Editor bila-bila masa
+// ============================================================
+function setupManual() {
+  const laporan = autoSetupDatabase();
+  try {
+    Browser.msgBox('✅ Setup & Migrate Selesai!\n\n' + laporan);
+  } catch(e) {
+    Logger.log('Setup selesai:\n' + laporan);
+  }
+}
+
+// ============================================================
+// AUTO SETUP DATABASE + AUTO MIGRATE
+// ============================================================
+function autoSetupDatabase() {
+  const ss     = SpreadsheetApp.getActiveSpreadsheet();
+  const log_   = [];
+
+  const sheets = [
+    { name: SHEET_NAME_REKOD,    headers: HEADERS_REKOD,    bg: '#1e3a5f', fg: '#ffffff', empty: '-' },
+    { name: SHEET_NAME_PENGGUNA, headers: HEADERS_PENGGUNA, bg: '#2d6a4f', fg: '#ffffff', empty: '' },
+    { name: SHEET_NAME_LOG,      headers: HEADERS_LOG,      bg: '#7b2d8b', fg: '#ffffff', empty: '' },
+    { name: SHEET_NAME_CONFIG,   headers: HEADERS_CONFIG,   bg: '#555555', fg: '#ffffff', empty: '' },
+    { name: SHEET_NAME_JENIS,    headers: ['Nama_Jenis','Status'], bg: '#0369a1', fg: '#ffffff', empty: '' },
+  ];
+
+  sheets.forEach(cfg => {
+    const result = _syncSheet(ss, cfg.name, cfg.headers, cfg.bg, cfg.fg, cfg.empty);
+    log_.push(result);
+  });
+
+  _seedDefaultUsers(ss);
+  _seedConfig(ss);
+
+  return log_.join('\n');
+}
+
+// _syncSheet — cipta sheet baharu ATAU kemaskini sheet sedia ada
+// Strategi: semak nama header mengikut posisi DAN senarai nama yang ada
+function _syncSheet(ss, name, headers, headerBg, headerFg, emptyVal) {
+  let sheet = ss.getSheetByName(name);
+  let isNew  = false;
+
+  // ── 1. CIPTA SHEET BARU jika tiada ──────────────────────
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    const hRange = sheet.getRange(1, 1, 1, headers.length);
+    hRange.setValues([headers]);
+    hRange.setBackground(headerBg);
+    hRange.setFontColor(headerFg);
+    hRange.setFontWeight('bold');
+    hRange.setFontSize(10);
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidths(1, headers.length, 160);
+    Logger.log('[' + name + '] (BARU) - ' + headers.length + ' kolum dicipta');
+    return name + ' (BARU)';
+  }
+
+  // ── 2. BACA HEADER SEDIA ADA ────────────────────────────
+  const lastCol       = Math.max(sheet.getLastColumn(), 1);
+  const existingRow   = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const existingNames = existingRow.map(h => String(h).trim()); // senarai nama sedia ada
+  const changes       = [];
+
+  headers.forEach((headerName, idx) => {
+    const col     = idx + 1;
+    const current = existingNames[idx] || '';
+
+    // Nama sudah betul pada posisi ini — skip
+    if (current === headerName) return;
+
+    // Nama header ini sudah ada pada posisi lain — jangan overwrite (data mungkin ada)
+    if (existingNames.includes(headerName)) return;
+
+    // Kolum kosong atau belum ada — tambah header baharu
+    const cell = sheet.getRange(1, col);
+    cell.setValue(headerName);
+    cell.setBackground(headerBg);
+    cell.setFontColor(headerFg);
+    cell.setFontWeight('bold');
+    cell.setFontSize(10);
+    sheet.setColumnWidth(col, 160);
+
+    // Isi nilai lalai untuk data sedia ada
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, col, lastRow - 1, 1).setValue(emptyVal !== undefined ? emptyVal : '-');
+    }
+
+    changes.push('+ ' + headerName + ' (kol ' + col + ')');
+  });
+
+  // ── 3. TAMBAH KOLUM HUJUNG jika jumlah header bertambah ─
+  const existingFilled = existingNames.filter(h => h !== '').length;
+  for (let i = existingFilled; i < headers.length; i++) {
+    const headerName = headers[i];
+    if (existingNames.includes(headerName)) continue;
+
+    const col  = i + 1;
+    const cell = sheet.getRange(1, col);
+    cell.setValue(headerName);
+    cell.setBackground(headerBg);
+    cell.setFontColor(headerFg);
+    cell.setFontWeight('bold');
+    cell.setFontSize(10);
+    sheet.setColumnWidth(col, 160);
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, col, lastRow - 1, 1).setValue(emptyVal !== undefined ? emptyVal : '-');
+    }
+
+    if (!changes.some(c => c.includes(headerName))) {
+      changes.push('+ ' + headerName + ' (kol ' + col + ')');
+    }
+  }
+
+  const status = changes.length > 0
+    ? '(DIKEMASKINI: ' + changes.length + ' kolum baru)'
+    : '(tiada perubahan)';
+
+  if (changes.length > 0) Logger.log('[' + name + '] ' + changes.join(', '));
+  return name + ' ' + status;
+}
+
+
+
+// Seed bootstrap admin SAHAJA — sistem ini tidak guna akaun demo/palsu.
+// Akaun Kakitangan didaftarkan sendiri melalui "Permohonan Akaun Baharu" di halaman log masuk,
+// dan perlu DILULUSKAN oleh Pentadbir sebelum boleh log masuk.
+// Akaun Unit Kejururawatan / Unit Sumber Manusia / Pentadbir tambahan dicipta oleh
+// Pentadbir Sistem melalui modul "Senarai Pengguna" (status terus Aktif).
+const STATUS_AKAUN = {
+  AKTIF:    'Aktif',
+  MENUNGGU: 'Menunggu Kelulusan',
+  DITOLAK:  'Ditolak'
+};
+
+function _seedDefaultUsers(ss) {
+  const sheet = ss.getSheetByName(SHEET_NAME_PENGGUNA);
+  if (sheet.getLastRow() > 1) return;
+
+  const now = new Date().toISOString();
+  const bootstrapAdmin = [
+    ['admin', 'Pentadbir Sistem', 'admin123', 'admin', 'semua', 'admin@htpn.gov.my', '', 'Pentadbir Sistem', now, STATUS_AKAUN.AKTIF, ''],
+  ];
+
+  sheet.getRange(2, 1, bootstrapAdmin.length, bootstrapAdmin[0].length).setValues(bootstrapAdmin);
+}
+
+function _seedConfig(ss) {
+  const sheet = ss.getSheetByName(SHEET_NAME_CONFIG);
+  if (sheet.getLastRow() > 1) return;
+
+  const JENIS = [
+    'Borang CTR Kelompok (Aktiviti Khidmat Masyarakat)',
+    'Borang CTR Kelompok (Christmas Eve)',
+    'Borang CTR Kelompok (Deepavali)',
+    'Borang CTR Kelompok (Good Friday)',
+    'Borang CTR Kelompok (Hadir Mahkamah Luar Ibu Pejabat)',
+    'Borang CTR Kelompok (Hari Mengundi)',
+    'Borang CTR Kelompok (Hari Raya Haji Kedua)',
+    'Borang CTR Kelompok (Isteri Bersalin)',
+    'Borang CTR Kelompok (Jurulatih Program Latihan Khidmat Negara (PLKN))',
+    'Borang CTR Kelompok (Keagamaan)',
+    'Borang CTR Kelompok (Lawatan Kebudayaan Di Luar Negeri)',
+    'Borang CTR Kelompok (Mengambil Peperiksaan)',
+    'Borang CTR Kelompok (Menghadiri Aktiviti Koperasi)',
+    'Borang CTR Kelompok (Menghadiri Mesyuarat/Bengkel/Seminar Anjuran Pihak Pekerja MBK)',
+    'Borang CTR Kelompok (Menjaga Ahli Keluarga Sakit)',
+    'Borang CTR Kelompok (Pertandingan Musabaqah Al-Quran)',
+    'Borang CTR Kelompok (Program Pertukaran Peringkat Antarabangsa)',
+    'Borang CTR Kelompok (Rawatan Hemodialisis)',
+    'Borang CTR Kelompok (Sumbangan Ilmu Peringkat Antarabangsa)',
+    'Borang CTR Kelompok (Thaipusam)',
+    'Borang CTR Kelompok (Umrah)',
+    'Borang CTR Kelompok (Urusan Kematian Ahli Keluarga Terdekat)',
+    'Borang Cuti Tanpa Rekod (Cuti Gantian)',
+    'Borang Cuti Tanpa Rekod (Cuti Kursus Sambilan di IPT Dalam Negara)',
+    'Borang Cuti Tanpa Rekod (Cuti Lain-Lain Kursus (Kesatuan Sekerja/Kepimpinan Belia dan Bina Semangat))',
+    'Borang Cuti Tanpa Rekod (Cuti Latihan Pasukan Sukarela)',
+    'Borang Cuti Tanpa Rekod (Cuti Menderma Organ)',
+    'Borang Cuti Tanpa Rekod (Cuti Menghadiri Konvensyen Dwi-Tahunan Dua (2) Tahun Sekali Bagi Pemilihan Pihak Pekerja MBK)',
+    'Borang Cuti Tanpa Rekod (Cuti Menghadiri Latihan atau Khemah Tahunan Pertubuhan/Persatuan)',
+    'Borang Cuti Tanpa Rekod (Cuti Menghadiri Mesyuarat Persatuan Ikhtisas)',
+    'Borang Cuti Tanpa Rekod (Cuti Menghadiri Program Latihan Khidmat Negara)',
+    'Borang Cuti Tanpa Rekod (Cuti Pegawai Yang Terlibat Dalam Pertandingan Sukan Di Peringkat Kebangsaan Dan/Atau Antarabangsa)',
+    'Borang Cuti Tanpa Rekod (Cuti Songkran (Berketurunan Siam - 13 April))',
+    'Borang Cuti Tanpa Rekod (Cuti Tugas Khas Perubatan)',
+    'Borang Cuti Tanpa Rekod (Cuti Vaisakhi)',
+    'Borang Cuti Tanpa Rekod (Hari Gawai)',
+    'Borang Cuti Tanpa Rekod (Pesta Kaamatan)',
+    'Borang Cuti Tanpa Rekod (Pelepasan Bagi Petugas Lembaga Tabung Haji)',
+    'Borang Kebenaran Tidak Hadir Bekerja Atas Sebab Kecemasan Am',
+    'Borang Kebenaran Tidak Hadir Bertugas Atas Perintah Akta 342',
+    'Borang Cuti Kerana Berkursus/Belajar',
+    'Borang Cuti Rehat Selepas Berkursus Lebih 12 Bulan',
+    'Borang Cuti Sabbatical',
+    'Borang Cuti Sambilan',
+    'Borang Cuti Untuk Membuat Kerja Penyelidikan',
+    'Borang Cuti Tanpa Gaji',
+    'Borang Cuti Separuh Gaji',
+    'Borang Cuti Bagi Kursus Luar Kampus Di Malaysia (Tanpa Gaji)',
+    'Borang Cuti Mengikut Pasangan Bertugas/Berkursus Di Dalam/Luar Negeri (Tanpa Gaji)',
+    'Borang Cuti Bersalin',
+    'Borang Cuti Bersalin (Tanpa Gaji)',
+    'Borang Cuti Menjaga Anak',
+    'Borang Cuti Sakit (Awam)',
+    'Borang Cuti Sakit (Swasta)',
+    'Borang Cuti Menjaga Anak Yang Dikuarantin atau Memerlukan Pengasingan',
+    'Borang Cuti Sakit Lanjutan (Separuh Gaji)',
+    'Borang Cuti Sakit Lanjutan (Tanpa Gaji)',
+    'Borang Cuti Perubatan Khas',
+    'Borang Cuti Kecederaan',
+    'Borang Cuti Tibi',
+    'Borang Cuti Kusta',
+    'Borang Cuti Kuarantina',
+    'Borang Cuti Rehat',
+    'Borang Cuti Rehat Khas',
+    'Borang Cuti Rehat Lebihan GCR',
+    'Borang Cuti Penggal',
+  ];
+
+  const JAWATAN = [
+    'JURURAWAT MASYARAKAT',
+    'KETUA JURURAWAT',
+    'PEMBANTU PERAWATAN KESIHATAN',
+    'JURURAWAT PAKAR',
+    'PEGAWAI KEJURURAWATAN',
+  ];
+
+  const UNIT = [
+    'WAD KANAK-KANAK',
+    'WAD WANITA',
+    'WAD LELAKI',
+    'ICU',
+    'KECEMASAN',
+    'OT',
+    'KLINIK',
+  ];
+
+  const configs = [
+    ['sistem_nama',    'DDRS - Sistem Pengurusan Dokumen'],
+    ['unit_nama',      'Unit Kejururawatan, HTPN'],
+    ['versi',          '2.0'],
+    ['admin_password', 'admin123'],
+    ['tahun_copy',     '2026-2028'],
+    ['jenis_dokumen',  JENIS.join('||')],
+    ['jawatan',        JAWATAN.join('||')],
+    ['unit',           UNIT.join('||')],
+  ];
+  sheet.getRange(2, 1, configs.length, 2).setValues(configs);
+
+  // Seed sheet Jenis_Dokumen berasingan — lebih mudah urus dalam spreadsheet
+  _seedJenisDokumen(ss);
+}
+
+// Jalankan fungsi ini SEKALI dari editor GAS jika sheet Konfigurasi sudah wujud
+// tetapi tiada data jenis_dokumen, jawatan, atau unit
+function seedDataKonfigurasi() {
+  autoSetupDatabase();
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_CONFIG);
+  const data  = sheet.getDataRange().getValues();
+  const keys  = data.slice(1).map(r => r[0]);
+
+  const JENIS = [
+    'Borang CTR Kelompok (Aktiviti Khidmat Masyarakat)',
+    'Borang CTR Kelompok (Christmas Eve)',
+    'Borang CTR Kelompok (Deepavali)',
+    'Borang CTR Kelompok (Good Friday)',
+    'Borang CTR Kelompok (Hadir Mahkamah Luar Ibu Pejabat)',
+    'Borang CTR Kelompok (Hari Mengundi)',
+    'Borang CTR Kelompok (Hari Raya Haji Kedua)',
+    'Borang CTR Kelompok (Isteri Bersalin)',
+    'Borang CTR Kelompok (Jurulatih Program Latihan Khidmat Negara (PLKN))',
+    'Borang CTR Kelompok (Keagamaan)',
+    'Borang CTR Kelompok (Lawatan Kebudayaan Di Luar Negeri)',
+    'Borang CTR Kelompok (Mengambil Peperiksaan)',
+    'Borang CTR Kelompok (Menghadiri Aktiviti Koperasi)',
+    'Borang CTR Kelompok (Menghadiri Mesyuarat/Bengkel/Seminar Anjuran Pihak Pekerja MBK)',
+    'Borang CTR Kelompok (Menjaga Ahli Keluarga Sakit)',
+    'Borang CTR Kelompok (Pertandingan Musabaqah Al-Quran)',
+    'Borang CTR Kelompok (Program Pertukaran Peringkat Antarabangsa)',
+    'Borang CTR Kelompok (Rawatan Hemodialisis)',
+    'Borang CTR Kelompok (Sumbangan Ilmu Peringkat Antarabangsa)',
+    'Borang CTR Kelompok (Thaipusam)',
+    'Borang CTR Kelompok (Umrah)',
+    'Borang CTR Kelompok (Urusan Kematian Ahli Keluarga Terdekat)',
+    'Borang Cuti Tanpa Rekod (Cuti Gantian)',
+    'Borang Cuti Tanpa Rekod (Cuti Kursus Sambilan di IPT Dalam Negara)',
+    'Borang Cuti Tanpa Rekod (Cuti Lain-Lain Kursus (Kesatuan Sekerja/Kepimpinan Belia dan Bina Semangat))',
+    'Borang Cuti Tanpa Rekod (Cuti Latihan Pasukan Sukarela)',
+    'Borang Cuti Tanpa Rekod (Cuti Menderma Organ)',
+    'Borang Cuti Tanpa Rekod (Cuti Menghadiri Konvensyen Dwi-Tahunan Dua (2) Tahun Sekali Bagi Pemilihan Pihak Pekerja MBK)',
+    'Borang Cuti Tanpa Rekod (Cuti Menghadiri Latihan atau Khemah Tahunan Pertubuhan/Persatuan)',
+    'Borang Cuti Tanpa Rekod (Cuti Menghadiri Mesyuarat Persatuan Ikhtisas)',
+    'Borang Cuti Tanpa Rekod (Cuti Menghadiri Program Latihan Khidmat Negara)',
+    'Borang Cuti Tanpa Rekod (Cuti Pegawai Yang Terlibat Dalam Pertandingan Sukan Di Peringkat Kebangsaan Dan/Atau Antarabangsa)',
+    'Borang Cuti Tanpa Rekod (Cuti Songkran (Berketurunan Siam - 13 April))',
+    'Borang Cuti Tanpa Rekod (Cuti Tugas Khas Perubatan)',
+    'Borang Cuti Tanpa Rekod (Cuti Vaisakhi)',
+    'Borang Cuti Tanpa Rekod (Hari Gawai)',
+    'Borang Cuti Tanpa Rekod (Pesta Kaamatan)',
+    'Borang Cuti Tanpa Rekod (Pelepasan Bagi Petugas Lembaga Tabung Haji)',
+    'Borang Kebenaran Tidak Hadir Bekerja Atas Sebab Kecemasan Am',
+    'Borang Kebenaran Tidak Hadir Bertugas Atas Perintah Akta 342',
+    'Borang Cuti Kerana Berkursus/Belajar',
+    'Borang Cuti Rehat Selepas Berkursus Lebih 12 Bulan',
+    'Borang Cuti Sabbatical',
+    'Borang Cuti Sambilan',
+    'Borang Cuti Untuk Membuat Kerja Penyelidikan',
+    'Borang Cuti Tanpa Gaji',
+    'Borang Cuti Separuh Gaji',
+    'Borang Cuti Bagi Kursus Luar Kampus Di Malaysia (Tanpa Gaji)',
+    'Borang Cuti Mengikut Pasangan Bertugas/Berkursus Di Dalam/Luar Negeri (Tanpa Gaji)',
+    'Borang Cuti Bersalin',
+    'Borang Cuti Bersalin (Tanpa Gaji)',
+    'Borang Cuti Menjaga Anak',
+    'Borang Cuti Sakit (Awam)',
+    'Borang Cuti Sakit (Swasta)',
+    'Borang Cuti Menjaga Anak Yang Dikuarantin atau Memerlukan Pengasingan',
+    'Borang Cuti Sakit Lanjutan (Separuh Gaji)',
+    'Borang Cuti Sakit Lanjutan (Tanpa Gaji)',
+    'Borang Cuti Perubatan Khas',
+    'Borang Cuti Kecederaan',
+    'Borang Cuti Tibi',
+    'Borang Cuti Kusta',
+    'Borang Cuti Kuarantina',
+    'Borang Cuti Rehat',
+    'Borang Cuti Rehat Khas',
+    'Borang Cuti Rehat Lebihan GCR',
+    'Borang Cuti Penggal',
+  ];
+
+  const JAWATAN = ['JURURAWAT MASYARAKAT','KETUA JURURAWAT','PEMBANTU PERAWATAN KESIHATAN','JURURAWAT PAKAR','PEGAWAI KEJURURAWATAN'];
+  const UNIT    = ['WAD KANAK-KANAK','WAD WANITA','WAD LELAKI','ICU','KECEMASAN','OT','KLINIK'];
+
+  const toSeed = [
+    { kunci:'jenis_dokumen', nilai:JENIS.join('||') },
+    { kunci:'jawatan',       nilai:JAWATAN.join('||') },
+    { kunci:'unit',          nilai:UNIT.join('||') },
+  ];
+
+  let seeded = 0;
+  toSeed.forEach(({ kunci, nilai }) => {
+    if (!keys.includes(kunci)) {
+      sheet.appendRow([kunci, nilai]);
+      seeded++;
+    }
+  });
+
+  Browser.msgBox(`seedDataKonfigurasi selesai. ${seeded} kunci baru ditambah ke sheet Konfigurasi.\n\nSila refresh web app.`);
+}
+
+// ============================================================
+// AUTENTIKASI
+// ============================================================
+function doLogin(emel, password) {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PENGGUNA);
+  const data  = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    // Login menggunakan emel (kolum 6, index 5) dan kata laluan (kolum 3, index 2)
+    if (String(row[5]).trim().toLowerCase() === String(emel).trim().toLowerCase() &&
+        String(row[2]).trim() === String(password).trim()) {
+
+      // Kolum 10 (index 9) = Status_Akaun. Kosong/tiada dianggap Aktif (akaun lama/admin)
+      const status = String(row[9] || STATUS_AKAUN.AKTIF).trim() || STATUS_AKAUN.AKTIF;
+
+      if (status === STATUS_AKAUN.MENUNGGU) {
+        return { pending: true, status: 'menunggu', message: 'Akaun anda masih menunggu kelulusan Pentadbir Sistem.' };
+      }
+      if (status === STATUS_AKAUN.DITOLAK) {
+        return { pending: true, status: 'ditolak', message: 'Permohonan akaun anda telah ditolak. Sila hubungi Pentadbir Sistem.' };
+      }
+      return {
+        id:      row[0],
+        name:    row[1],
+        role:    row[3],
+        modules: String(row[4]).split(',').map(m => m.trim()),
+        unit:    row[10] || ''
+      };
+    }
+  }
+  return null;
+}
+
+// Permohonan Akaun Baharu — pendaftaran kendiri, status awal "Menunggu Kelulusan"
+function daftarAkaunBaru(data) {
+  autoSetupDatabase();
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_PENGGUNA);
+  const rows  = sheet.getDataRange().getValues();
+
+  const emelBersih = String(data.emel || '').trim().toLowerCase();
+  if (!emelBersih) return { success:false, message:'Emel tidak sah.' };
+  if (!data.password || String(data.password).length < 6) {
+    return { success:false, message:'Kata laluan mesti sekurang-kurangnya 6 aksara.' };
+  }
+
+  // Semak emel sudah wujud
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][5] || '').trim().toLowerCase() === emelBersih) {
+      return { success:false, message:'Emel ini sudah didaftarkan. Sila log masuk atau hubungi Pentadbir.' };
+    }
+  }
+
+  const id  = 'user' + Date.now().toString().slice(-6) + Math.floor(Math.random()*900+100);
+  const now = new Date().toISOString();
+  sheet.appendRow([
+    id, data.nama, data.password, 'user', 'hantar,status',
+    data.emel, data.tel || '', data.jawatan || '', now, STATUS_AKAUN.MENUNGGU, data.unit || ''
+  ]);
+
+  return { success:true, id };
+}
+
+// Dapatkan senarai akaun yang menunggu kelulusan (untuk Pentadbir)
+function dapatkanPermohonanMenunggu() {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PENGGUNA);
+  const data  = sheet.getDataRange().getValues();
+  return data.slice(1).filter(r => r[0] !== '' && String(r[9]).trim() === STATUS_AKAUN.MENUNGGU).map(r => ({
+    id: r[0], name: r[1], role: r[3], emel: r[5], tel: r[6], jawatan: r[7], tarikhKemaskini: r[8]
+  }));
+}
+
+// Pentadbir meluluskan / menolak permohonan akaun
+function luluskanAkaun(id, tindakan) {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PENGGUNA);
+  const rows  = sheet.getDataRange().getValues();
+  const statusBaru = tindakan === 'LULUS' ? STATUS_AKAUN.AKTIF : STATUS_AKAUN.DITOLAK;
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === String(id).trim()) {
+      sheet.getRange(i+1, 10).setValue(statusBaru);
+      sheet.getRange(i+1, 9).setValue(new Date().toISOString());
+      break;
+    }
+  }
+  return dapatkanPermohonanMenunggu();
+}
+
+// ============================================================
+// OPERASI DOKUMEN
+// ============================================================
+
+// Pengguna hantar dokumen baru → masuk Inbox Unit Kejururawatan
+function simpanSerahan(data) {
+  autoSetupDatabase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_REKOD);
+  
+  const row = [
+    data.id,                   // ID_Dokumen      (1)
+    data.jenisDokumen || '-',  // Jenis_Dokumen   (2)
+    data.namaDokumen,          // Nama_Dokumen     (3)
+    data.namaPenghantar,       // Nama_Penghantar  (4)
+    data.idPenghantar,         // ID_Penghantar    (5)
+    data.tarikhSerahan,        // Tarikh_Hantar    (6)
+    STATUS.DIHANTAR,           // Status           (7)
+    data.catatan || '-',       // Catatan_Penghantar (8)
+    '-', '-', '-', '-',        // Penyemak: Nama,Tarikh,Tindakan,Catatan (9-12)
+    '-', '-',                  // Penerima USM: ID, Nama (13-14)
+    '-', '-', '-', '-',        // USM: Nama,Tarikh,Tindakan,Catatan (15-18)
+    new Date().toISOString(),  // Tarikh_Kemaskini (19)
+    data.unitPenghantar || '-' // Unit_Penghantar  (20)
+  ];
+  
+  sheet.appendRow(row);
+  _catatLog(ss, data.id, data.namaDokumen, data.namaPenghantar, 'user', 
+            'HANTAR', `Dokumen dihantar untuk semakan. Catatan: ${data.catatan || '-'}`);
+  
+  return dapatkanSenarai();
+}
+
+// Unit Kejururawatan: Terima (→ Disemak) atau Tolak (→ Ditolak)
+function tindakanPenyemak(docId, tindakan, namaPenyemak, catatanPenyemak) {
+  autoSetupDatabase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_REKOD);
+  const data = sheet.getDataRange().getValues();
+  
+  const tarikhSekarang = new Date().toLocaleString('ms-MY', {
+    day: '2-digit', month: 'short', year: 'numeric', 
+    hour: '2-digit', minute: '2-digit'
+  });
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === docId) {
+      const newStatus = tindakan === 'TERIMA' ? STATUS.DISEMAK : STATUS.DITOLAK;
+      sheet.getRange(i + 1, 7).setValue(newStatus);          // Status (col 7)
+      sheet.getRange(i + 1, 9).setValue(namaPenyemak);       // Nama_Penyemak (col 9)
+      sheet.getRange(i + 1, 10).setValue(tarikhSekarang);    // Tarikh_Semak (col 10)
+      sheet.getRange(i + 1, 11).setValue(tindakan);          // Tindakan_Penyemak (col 11)
+      sheet.getRange(i + 1, 12).setValue(catatanPenyemak || '-'); // Catatan_Penyemak (col 12)
+      sheet.getRange(i + 1, 19).setValue(new Date().toISOString()); // Tarikh_Kemaskini (col 19)
+      
+      _catatLog(ss, docId, data[i][2], namaPenyemak, 'penyemak', 
+                `PENYEMAK_${tindakan}`, `Penyemak ${tindakan} dokumen. Catatan: ${catatanPenyemak || '-'}`);
+      break;
+    }
+  }
+  return dapatkanSenarai();
+}
+
+// Unit Kejururawatan hantar ke Unit Sumber Manusia (dengan penerima yang dipilih)
+function hantarKeUSM(docId, namaPenyemak, catatanPenyemak, idPenerimaUSM, namaPenerimaUSM) {
+  autoSetupDatabase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_REKOD);
+  const data = sheet.getDataRange().getValues();
+  
+  const tarikhSekarang = new Date().toLocaleString('ms-MY', {
+    day: '2-digit', month: 'short', year: 'numeric', 
+    hour: '2-digit', minute: '2-digit'
+  });
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === docId) {
+      sheet.getRange(i + 1, 7).setValue(STATUS.KE_USM);           // Status (col 7)
+      sheet.getRange(i + 1, 9).setValue(namaPenyemak);            // Nama_Penyemak (col 9)
+      sheet.getRange(i + 1, 10).setValue(tarikhSekarang);         // Tarikh_Semak (col 10)
+      sheet.getRange(i + 1, 11).setValue('HANTAR_USM');           // Tindakan_Penyemak (col 11)
+      sheet.getRange(i + 1, 12).setValue(catatanPenyemak || '-'); // Catatan_Penyemak (col 12)
+      sheet.getRange(i + 1, 13).setValue(idPenerimaUSM || '-');   // ID_Penerima_USM (col 13)
+      sheet.getRange(i + 1, 14).setValue(namaPenerimaUSM || '-'); // Nama_Penerima_USM (col 14)
+      sheet.getRange(i + 1, 19).setValue(new Date().toISOString()); // Tarikh_Kemaskini (col 19)
+      
+      _catatLog(ss, docId, data[i][2], namaPenyemak, 'penyemak',
+                'HANTAR_USM', `Dihantar ke USM: ${namaPenerimaUSM}. Catatan: ${catatanPenyemak || '-'}`);
+      break;
+    }
+  }
+  return dapatkanSenarai();
+}
+
+// USM: Terima atau Tolak dokumen
+function tindakanUSM(docId, tindakan, namaUSM, catatanUSM) {
+  autoSetupDatabase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_REKOD);
+  const data = sheet.getDataRange().getValues();
+  
+  const tarikhSekarang = new Date().toLocaleString('ms-MY', {
+    day: '2-digit', month: 'short', year: 'numeric', 
+    hour: '2-digit', minute: '2-digit'
+  });
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === docId) {
+      const newStatus = tindakan === 'TERIMA' ? STATUS.SELESAI : STATUS.DITOLAK_USM;
+      sheet.getRange(i + 1, 7).setValue(newStatus);           // Status (col 7)
+      sheet.getRange(i + 1, 15).setValue(namaUSM);            // Nama_USM (col 15)
+      sheet.getRange(i + 1, 16).setValue(tarikhSekarang);     // Tarikh_USM (col 16)
+      sheet.getRange(i + 1, 17).setValue(tindakan);           // Tindakan_USM (col 17)
+      sheet.getRange(i + 1, 18).setValue(catatanUSM || '-');  // Catatan_USM (col 18)
+      sheet.getRange(i + 1, 19).setValue(new Date().toISOString()); // Tarikh_Kemaskini (col 19)
+      
+      _catatLog(ss, docId, data[i][2], namaUSM, 'usm',
+                `USM_${tindakan}`, `USM ${tindakan} dokumen. Catatan: ${catatanUSM || '-'}`);
+      break;
+    }
+  }
+  return dapatkanSenarai();
+}
+
+// Unit Kejururawatan / USM: Kembalikan sebagai Query kepada penghantar
+function tolakQuery(docId, jenis, namaPenolak, alasan, arahan) {
+  autoSetupDatabase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_REKOD);
+  const data = sheet.getDataRange().getValues();
+
+  const tarikhSekarang = new Date().toLocaleString('ms-MY', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+  const catatanGabung = alasan + (arahan ? ' | Arahan: ' + arahan : '');
+  const statusBaru = jenis === 'usm' ? STATUS.QUERY_USM : STATUS.QUERY;
+  const tindakanLog = jenis === 'usm' ? 'USM_QUERY' : 'PENYEMAK_QUERY';
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === docId) {
+      sheet.getRange(i + 1, 7).setValue(statusBaru);             // Status
+      if (jenis === 'usm') {
+        sheet.getRange(i + 1, 15).setValue(namaPenolak);         // Nama_USM
+        sheet.getRange(i + 1, 16).setValue(tarikhSekarang);      // Tarikh_USM
+        sheet.getRange(i + 1, 17).setValue('QUERY');             // Tindakan_USM
+        sheet.getRange(i + 1, 18).setValue(catatanGabung);       // Catatan_USM
+      } else {
+        sheet.getRange(i + 1, 9).setValue(namaPenolak);          // Nama_Penyemak
+        sheet.getRange(i + 1, 10).setValue(tarikhSekarang);      // Tarikh_Semak
+        sheet.getRange(i + 1, 11).setValue('QUERY');             // Tindakan_Penyemak
+        sheet.getRange(i + 1, 12).setValue(catatanGabung);       // Catatan_Penyemak
+      }
+      sheet.getRange(i + 1, 19).setValue(new Date().toISOString()); // Tarikh_Kemaskini
+      _catatLog(ss, docId, data[i][2], namaPenolak, jenis === 'usm' ? 'usm' : 'penyemak',
+                tindakanLog, `Sebab: ${alasan}${arahan ? ' | Arahan: ' + arahan : ''}`);
+      break;
+    }
+  }
+  return dapatkanSenarai();
+}
+
+// Penghantar: Hantar semula selepas query
+function hantarSemula(docId, namaPenghantar, catatan) {
+  autoSetupDatabase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_REKOD);
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === docId) {
+      sheet.getRange(i + 1, 7).setValue(STATUS.DIHANTAR);        // Kembali ke Dihantar
+      sheet.getRange(i + 1, 9).setValue('-');                    // Reset Nama_Penyemak
+      sheet.getRange(i + 1, 10).setValue('-');                   // Reset Tarikh_Semak
+      sheet.getRange(i + 1, 11).setValue('-');                   // Reset Tindakan_Penyemak
+      sheet.getRange(i + 1, 12).setValue('-');                   // Reset Catatan_Penyemak
+      sheet.getRange(i + 1, 13).setValue('-');                   // Reset ID_Penerima_USM
+      sheet.getRange(i + 1, 14).setValue('-');                   // Reset Nama_Penerima_USM
+      sheet.getRange(i + 1, 15).setValue('-');                   // Reset Nama_USM
+      sheet.getRange(i + 1, 16).setValue('-');                   // Reset Tarikh_USM
+      sheet.getRange(i + 1, 17).setValue('-');                   // Reset Tindakan_USM
+      sheet.getRange(i + 1, 18).setValue('-');                   // Reset Catatan_USM
+      sheet.getRange(i + 1, 19).setValue(new Date().toISOString()); // Tarikh_Kemaskini
+      _catatLog(ss, docId, data[i][2], namaPenghantar, 'user',
+                'HANTAR_SEMULA', catatan || 'Dihantar semula selepas query');
+      break;
+    }
+  }
+  return dapatkanSenarai();
+}
+
+// ============================================================
+// DAPATKAN DATA
+// ============================================================
+
+function dapatkanSenarai() {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_REKOD);
+  if (sheet.getLastRow() <= 1) return [];
+  
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS_REKOD.length).getValues();
+  return data.filter(r => r[0] !== '').map(r => ({
+    id:               r[0],
+    jenisDokumen:     r[1],
+    namaDokumen:      r[2],
+    namaPenghantar:   r[3],
+    idPenghantar:     r[4],
+    tarikhSerahan:    r[5],
+    status:           r[6],
+    catatan:          r[7],
+    namaPenyemak:     r[8],
+    tarikhSemak:      r[9],
+    tindakanPenyemak: r[10],
+    catatanPenyemak:  r[11],
+    idPenerimaUSM:    r[12],
+    namaPenerimaUSM:  r[13],
+    namaUSM:          r[14],
+    tarikhUSM:        r[15],
+    tindakanUSM:      r[16],
+    catatanUSM:       r[17],
+    tarikhKemaskini:  r[18],
+    unitPenghantar:   r[19] || '-'
+  })).reverse();
+}
+
+function dapatkanLog() {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_LOG);
+  if (sheet.getLastRow() <= 1) return [];
+  
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS_LOG.length).getValues();
+  return data.filter(r => r[0] !== '').map(r => ({
+    logId:       r[0],
+    idDokumen:   r[1],
+    namaDokumen: r[2],
+    pengguna:    r[3],
+    peranan:     r[4],
+    tindakan:    r[5],
+    catatan:     r[6],
+    tarikhMasa:  r[7]
+  })).reverse();
+}
+
+function dapatkanPengguna() {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PENGGUNA);
+  if (sheet.getLastRow() <= 1) return [];
+
+  const data = sheet.getDataRange().getValues();
+  return data.slice(1).filter(r => r[0] !== '').map(r => ({
+    id:      r[0],
+    name:    r[1],
+    role:    r[3],
+    modules: String(r[4]).split(',').map(m => m.trim()),
+    emel:    r[5] || '',
+    tel:     r[6] || '',
+    jawatan: r[7] || '',
+    status:  r[9] || 'Aktif',
+    unit:    r[10] || '',
+  }));
+}
+
+function dapatkanProfilSaya(userId) {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PENGGUNA);
+  const data  = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === String(userId).trim()) {
+      return {
+        id:      data[i][0],
+        name:    data[i][1],
+        role:    data[i][3],
+        modules: String(data[i][4]).split(',').map(m => m.trim()),
+        emel:    data[i][5] || '',
+        tel:     data[i][6] || '',
+        jawatan: data[i][7] || '',
+        unit:    data[i][10] || '',
+      };
+    }
+  }
+  return null;
+}
+
+function kemaskiniProfil(data) {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PENGGUNA);
+  const rows  = sheet.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === String(data.id).trim()) {
+      const emelSediaAda = rows[i][5] || '';
+      const emelBaharu   = (data.emel !== null && data.emel !== undefined) ? data.emel : emelSediaAda;
+      sheet.getRange(i+1, 2).setValue(data.name    || rows[i][1]);
+      sheet.getRange(i+1, 6).setValue(emelBaharu);
+      sheet.getRange(i+1, 7).setValue(data.tel     || '');
+      sheet.getRange(i+1, 8).setValue(data.jawatan || '');
+      sheet.getRange(i+1, 9).setValue(new Date().toISOString());
+      sheet.getRange(i+1, 11).setValue(data.unit   || '');  // Unit (kolum 11)
+      return {
+        success: true,
+        user: { id:data.id, name:data.name, role:rows[i][3],
+                modules: String(rows[i][4]).split(',').map(m=>m.trim()),
+                emel: emelBaharu, tel:data.tel, jawatan:data.jawatan, unit:data.unit }
+      };
+    }
+  }
+  return { success: false, message: 'Pengguna tidak dijumpai.' };
+}
+
+function tukarKataLaluan(userId, passLama, passBaharu) {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PENGGUNA);
+  const rows  = sheet.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === String(userId).trim()) {
+      if (String(rows[i][2]).trim() !== String(passLama).trim()) {
+        return { success: false, message: 'Kata laluan semasa tidak betul.' };
+      }
+      sheet.getRange(i+1, 3).setValue(passBaharu);
+      sheet.getRange(i+1, 9).setValue(new Date().toISOString());
+      return { success: true };
+    }
+  }
+  return { success: false, message: 'Pengguna tidak dijumpai.' };
+}
+
+
+
+// ============================================================
+// PENGURUSAN JENIS DOKUMEN
+// ============================================================
+// ============================================================
+// JENIS DOKUMEN — sheet khas (Jenis_Dokumen)
+// Setiap jenis dokumen pada baris tersendiri, mudah urus dalam spreadsheet
+// ============================================================
+
+const SENARAI_JENIS_DEFAULT = [
+  'Borang CTR Kelompok (Aktiviti Khidmat Masyarakat)',
+  'Borang CTR Kelompok (Christmas Eve)',
+  'Borang CTR Kelompok (Deepavali)',
+  'Borang CTR Kelompok (Good Friday)',
+  'Borang CTR Kelompok (Hadir Mahkamah Luar Ibu Pejabat)',
+  'Borang CTR Kelompok (Hari Mengundi)',
+  'Borang CTR Kelompok (Hari Raya Haji Kedua)',
+  'Borang CTR Kelompok (Isteri Bersalin)',
+  'Borang CTR Kelompok (Jurulatih Program Latihan Khidmat Negara (PLKN))',
+  'Borang CTR Kelompok (Keagamaan)',
+  'Borang CTR Kelompok (Lawatan Kebudayaan Di Luar Negeri)',
+  'Borang CTR Kelompok (Mengambil Peperiksaan)',
+  'Borang CTR Kelompok (Menghadiri Aktiviti Koperasi)',
+  'Borang CTR Kelompok (Menghadiri Mesyuarat/Bengkel/Seminar Anjuran Pihak Pekerja MBK)',
+  'Borang CTR Kelompok (Menjaga Ahli Keluarga Sakit)',
+  'Borang CTR Kelompok (Pertandingan Musabaqah Al-Quran)',
+  'Borang CTR Kelompok (Program Pertukaran Peringkat Antarabangsa)',
+  'Borang CTR Kelompok (Rawatan Hemodialisis)',
+  'Borang CTR Kelompok (Sumbangan Ilmu Peringkat Antarabangsa)',
+  'Borang CTR Kelompok (Thaipusam)',
+  'Borang CTR Kelompok (Umrah)',
+  'Borang CTR Kelompok (Urusan Kematian Ahli Keluarga Terdekat)',
+  'Borang Cuti Tanpa Rekod (Cuti Gantian)',
+  'Borang Cuti Tanpa Rekod (Cuti Kursus Sambilan di IPT Dalam Negara)',
+  'Borang Cuti Tanpa Rekod (Cuti Lain-Lain Kursus (Kesatuan Sekerja/Kepimpinan Belia dan Bina Semangat))',
+  'Borang Cuti Tanpa Rekod (Cuti Latihan Pasukan Sukarela)',
+  'Borang Cuti Tanpa Rekod (Cuti Menderma Organ)',
+  'Borang Cuti Tanpa Rekod (Cuti Menghadiri Konvensyen Dwi-Tahunan Dua (2) Tahun Sekali Bagi Pemilihan Pihak Pekerja MBK)',
+  'Borang Cuti Tanpa Rekod (Cuti Menghadiri Latihan atau Khemah Tahunan Pertubuhan/Persatuan)',
+  'Borang Cuti Tanpa Rekod (Cuti Menghadiri Mesyuarat Persatuan Ikhtisas)',
+  'Borang Cuti Tanpa Rekod (Cuti Menghadiri Program Latihan Khidmat Negara)',
+  'Borang Cuti Tanpa Rekod (Cuti Pegawai Yang Terlibat Dalam Pertandingan Sukan Di Peringkat Kebangsaan Dan/Atau Antarabangsa)',
+  'Borang Cuti Tanpa Rekod (Cuti Songkran (Berketurunan Siam - 13 April))',
+  'Borang Cuti Tanpa Rekod (Cuti Tugas Khas Perubatan)',
+  'Borang Cuti Tanpa Rekod (Cuti Vaisakhi)',
+  'Borang Cuti Tanpa Rekod (Hari Gawai)',
+  'Borang Cuti Tanpa Rekod (Pesta Kaamatan)',
+  'Borang Cuti Tanpa Rekod (Pelepasan Bagi Petugas Lembaga Tabung Haji)',
+  'Borang Kebenaran Tidak Hadir Bekerja Atas Sebab Kecemasan Am',
+  'Borang Kebenaran Tidak Hadir Bertugas Atas Perintah Akta 342',
+  'Borang Cuti Kerana Berkursus/Belajar',
+  'Borang Cuti Rehat Selepas Berkursus Lebih 12 Bulan',
+  'Borang Cuti Sabbatical',
+  'Borang Cuti Sambilan',
+  'Borang Cuti Untuk Membuat Kerja Penyelidikan',
+  'Borang Cuti Tanpa Gaji',
+  'Borang Cuti Separuh Gaji',
+  'Borang Cuti Bagi Kursus Luar Kampus Di Malaysia (Tanpa Gaji)',
+  'Borang Cuti Mengikut Pasangan Bertugas/Berkursus Di Dalam/Luar Negeri (Tanpa Gaji)',
+  'Borang Cuti Bersalin',
+  'Borang Cuti Bersalin (Tanpa Gaji)',
+  'Borang Cuti Menjaga Anak',
+  'Borang Cuti Sakit (Awam)',
+  'Borang Cuti Sakit (Swasta)',
+  'Borang Cuti Menjaga Anak Yang Dikuarantin atau Memerlukan Pengasingan',
+  'Borang Cuti Sakit Lanjutan (Separuh Gaji)',
+  'Borang Cuti Sakit Lanjutan (Tanpa Gaji)',
+  'Borang Cuti Perubatan Khas',
+  'Borang Cuti Kecederaan',
+  'Borang Cuti Tibi',
+  'Borang Cuti Kusta',
+  'Borang Cuti Kuarantina',
+  'Borang Cuti Rehat',
+  'Borang Cuti Rehat Khas',
+  'Borang Cuti Rehat Lebihan GCR',
+  'Borang Cuti Penggal',
+];
+
+// Seed sheet Jenis_Dokumen dengan senarai default
+function _seedJenisDokumen(ss) {
+  const sheet = ss.getSheetByName(SHEET_NAME_JENIS);
+  if (!sheet || sheet.getLastRow() > 1) return; // Sudah ada data — jangan overwrite
+  const rows = SENARAI_JENIS_DEFAULT.map(nama => [nama, 'Aktif']);
+  sheet.getRange(2, 1, rows.length, 2).setValues(rows);
+}
+
+// Ambil semua jenis dokumen yang Aktif dari sheet Jenis_Dokumen
+function dapatkanJenis() {
+  autoSetupDatabase();
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_JENIS);
+  if (!sheet || sheet.getLastRow() <= 1) {
+    _seedJenisDokumen(ss);
+    return SENARAI_JENIS_DEFAULT;
+  }
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+  return data
+    .filter(r => r[0] !== '' && String(r[1]).trim().toLowerCase() !== 'tidak aktif')
+    .map(r => String(r[0]).trim());
+}
+
+// Simpan senarai jenis dokumen — tulis semula sheet sepenuhnya
+function simpanJenis(senarai) {
+  autoSetupDatabase();
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_JENIS);
+
+  // Padam semua baris data lama
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).clearContent();
+  }
+
+  // Tulis semula
+  if (senarai.length > 0) {
+    const rows = senarai.map(nama => [nama, 'Aktif']);
+    sheet.getRange(2, 1, rows.length, 2).setValues(rows);
+  }
+  return senarai;
+}
+
+// Tambah satu jenis dokumen baharu ke sheet
+function tambahSatuJenis(nama) {
+  autoSetupDatabase();
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_JENIS);
+  sheet.appendRow([nama.trim(), 'Aktif']);
+  return dapatkanJenis();
+}
+
+// Jalankan dari editor GAS: tambah senarai borang ke sheet Jenis_Dokumen
+// (untuk database sedia ada yang sheet-nya kosong)
+function seedDataKonfigurasi() {
+  autoSetupDatabase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  _seedJenisDokumen(ss);
+
+  // Seed jawatan dan unit dalam Konfigurasi jika tiada
+  const cfgSheet = ss.getSheetByName(SHEET_NAME_CONFIG);
+  const cfgData  = cfgSheet.getDataRange().getValues();
+  const keys     = cfgData.slice(1).map(r => r[0]);
+
+  const JAWATAN = ['JURURAWAT MASYARAKAT','KETUA JURURAWAT','PEMBANTU PERAWATAN KESIHATAN','JURURAWAT PAKAR','PEGAWAI KEJURURAWATAN'];
+  const UNIT    = ['WAD KANAK-KANAK','WAD WANITA','WAD LELAKI','ICU','KECEMASAN','OT','KLINIK'];
+
+  let seeded = 0;
+  if (!keys.includes('jawatan')) { cfgSheet.appendRow(['jawatan', JAWATAN.join('||')]); seeded++; }
+  if (!keys.includes('unit'))    { cfgSheet.appendRow(['unit',    UNIT.join('||')]);    seeded++; }
+
+  const jenisSheet = ss.getSheetByName(SHEET_NAME_JENIS);
+  const jenisCount = jenisSheet ? jenisSheet.getLastRow() - 1 : 0;
+
+  Browser.msgBox(
+    '✅ seedDataKonfigurasi selesai!\n\n' +
+    '• Sheet Jenis_Dokumen: ' + jenisCount + ' borang\n' +
+    '• Konfigurasi ditambah: ' + seeded + ' kunci baharu\n\n' +
+    'Sila refresh web app.'
+  );
+}
+
+// ============================================================
+// KONFIGURASI JAWATAN DAN UNIT
+function _simpanKonfigurasi(sheet, kunci, senarai) {
+  const data = sheet.getDataRange().getValues();
+  const nilai = senarai.join('||');
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === kunci) { sheet.getRange(i + 1, 2).setValue(nilai); return; }
+  }
+  sheet.appendRow([kunci, nilai]);
+}
+
+function _dapatkanKonfigurasi(sheet, kunci, defaults) {
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === kunci) {
+      const val = String(data[i][1] || '');
+      return val ? val.split('||').map(j => j.trim()).filter(j => j) : [];
+    }
+  }
+  _simpanKonfigurasi(sheet, kunci, defaults);
+  return defaults;
+}
+
+function dapatkanJawatan() {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_CONFIG);
+  const defaults = ['JURURAWAT MASYARAKAT','KETUA JURURAWAT','PEMBANTU PERAWATAN KESIHATAN','JURURAWAT PAKAR','PEGAWAI KEJURURAWATAN'];
+  return _dapatkanKonfigurasi(sheet, 'jawatan', defaults);
+}
+
+function simpanJawatan(senarai) {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_CONFIG);
+  _simpanKonfigurasi(sheet, 'jawatan', senarai);
+  return senarai;
+}
+
+function dapatkanUnit() {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_CONFIG);
+  const defaults = ['WAD KANAK-KANAK','WAD WANITA','WAD LELAKI','ICU','KECEMASAN','OT','KLINIK'];
+  return _dapatkanKonfigurasi(sheet, 'unit', defaults);
+}
+
+function simpanUnit(senarai) {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_CONFIG);
+  _simpanKonfigurasi(sheet, 'unit', senarai);
+  return senarai;
+}
+
+// ============================================================
+// PENGURUSAN PENGGUNA (ADMIN)
+// ============================================================
+function simpanPengguna(data) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_PENGGUNA);
+  const rows  = sheet.getDataRange().getValues();
+
+  const idx = rows.findIndex((r, i) => i > 0 && r[0] === data.originalId);
+  const existingRow  = idx > 0 ? rows[idx] : [];
+  const statusKekal  = existingRow[9] || STATUS_AKAUN.AKTIF;
+  // Jika kata laluan null/kosong semasa sunting → kekalkan kata laluan sedia ada
+  // Jika pengguna baharu dan tiada kata laluan → set nilai lalai (sepatutnya tidak berlaku kerana frontend validasi)
+  const passwordFinal = (data.password && String(data.password).trim())
+    ? String(data.password).trim()
+    : (existingRow[2] || 'user123');
+
+  const rowData = [
+    data.id,
+    data.name,
+    passwordFinal,
+    data.role,
+    Array.isArray(data.modules) ? data.modules.join(',') : data.modules,
+    existingRow[5] || data.id,  // Emel — guna ID sebagai emel jika kosong
+    data.tel      !== undefined ? (data.tel      || '') : (existingRow[6] || ''),  // No_Tel
+    data.jawatan  !== undefined ? (data.jawatan  || '') : (existingRow[7] || ''),  // Jawatan
+    new Date().toISOString(),
+    statusKekal,                 // Status_Akaun
+    data.unit     !== undefined ? (data.unit     || '') : (existingRow[10] || ''), // Unit_Wad
+  ];
+
+  if (idx > 0) {
+    sheet.getRange(idx + 1, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    sheet.appendRow(rowData);
+  }
+  return dapatkanPengguna();
+}
+
+function padamPenggunaAkaun(id) {
+  if (id === 'admin') return dapatkanPengguna();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PENGGUNA);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === id) { sheet.deleteRow(i + 1); break; }
+  }
+  return dapatkanPengguna();
+}
+
+function padamSemuaRekod(password) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const configSheet = ss.getSheetByName(SHEET_NAME_CONFIG);
+  const configData = configSheet.getDataRange().getValues();
+  let adminPass = 'admin123';
+  
+  for (let i = 1; i < configData.length; i++) {
+    if (configData[i][0] === 'admin_password') { adminPass = configData[i][1]; break; }
+  }
+  
+  if (password !== adminPass) return { success: false, message: 'Kata laluan salah.' };
+  
+  const rekodSheet = ss.getSheetByName(SHEET_NAME_REKOD);
+  if (rekodSheet.getLastRow() > 1) {
+    rekodSheet.deleteRows(2, rekodSheet.getLastRow() - 1);
+  }
+  const logSheet = ss.getSheetByName(SHEET_NAME_LOG);
+  if (logSheet.getLastRow() > 1) {
+    logSheet.deleteRows(2, logSheet.getLastRow() - 1);
+  }
+  return { success: true };
+}
+
+// ============================================================
+// UTILITI DALAMAN
+// ============================================================
+function _catatLog(ss, docId, docName, pengguna, peranan, tindakan, catatan) {
+  const sheet = ss.getSheetByName(SHEET_NAME_LOG);
+  const logId = 'LOG' + Date.now();
+  const tarikhMasa = new Date().toLocaleString('ms-MY', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+  sheet.appendRow([logId, docId, docName, pengguna, peranan, tindakan, catatan, tarikhMasa]);
+}
+
+// ============================================================
+// ============================================================
+// SERAHAN DALAMAN (Unit Kejururawatan ↔ USM)
+// ============================================================
+const SHEET_NAME_DALAMAN = 'Serahan_Dalaman';
+const SHEET_NAME_SD_CHAT = 'Serahan_Dalaman_Chat';
+const HEADERS_DALAMAN = [
+  'ID_Serahan','Daripada_ID','Daripada_Nama','Daripada_Peranan',
+  'Kepada_ID','Kepada_Nama','Kepada_Peranan',
+  'Perihal','Catatan','Status',
+  'Tarikh_Hantar','Tarikh_Baca','Tarikh_Sahkan','Catatan_Sahkan','Tarikh_Kemaskini',
+  'Jenis_Dokumen'  // kolum ke-16, ditambah di hujung untuk migrasi selamat
+];
+const HEADERS_SD_CHAT = ['ID_Serahan','User_ID','Nama','Peranan','Mesej','Tarikh_Masa'];
+
+function _ensureSerahanDalamanSheet(ss) {
+  _syncSheet(ss, SHEET_NAME_DALAMAN, HEADERS_DALAMAN, '#0f766e', '#ffffff', '-');
+  _syncSheet(ss, SHEET_NAME_SD_CHAT, HEADERS_SD_CHAT, '#0f766e', '#ffffff', '-');
+}
+
+// Dapatkan semua serahan dalaman milik pengguna, lengkap dengan chat setiap satu
+function dapatkanSerahanDalaman(userId, peranan) {
+  autoSetupDatabase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  _ensureSerahanDalamanSheet(ss);
+  const sheet = ss.getSheetByName(SHEET_NAME_DALAMAN);
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+
+  // Ambil semua chat sekali sahaja, kumpul ikut ID_Serahan
+  const chatSheet = ss.getSheetByName(SHEET_NAME_SD_CHAT);
+  const chatMap = {};
+  if (chatSheet && chatSheet.getLastRow() > 1) {
+    const chatData = chatSheet.getRange(2, 1, chatSheet.getLastRow() - 1, HEADERS_SD_CHAT.length).getValues();
+    chatData.forEach(r => {
+      if (!r[0]) return;
+      if (!chatMap[r[0]]) chatMap[r[0]] = [];
+      chatMap[r[0]].push({ userId: r[1], nama: r[2], peranan: r[3], teks: r[4], masa: r[5] });
+    });
+  }
+
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS_DALAMAN.length).getValues();
+  return data.filter(r => r[0] !== '').map(r => ({
+    id:              r[0],
+    daripadaId:      r[1],
+    daripadaNama:    r[2],
+    daripadaPeranan: r[3],
+    kepadaId:        r[4],
+    kepadaNama:      r[5],
+    kepadaPeranan:   r[6],
+    perihal:         r[7],
+    catatan:         r[8],
+    status:          r[9],
+    tarikhHantar:    r[10],
+    tarikhBaca:      r[11],
+    tarikhSahkan:    r[12],
+    catatanSahkan:   r[13],
+    tarikhKemaskini: r[14],
+    jenisDokumen:    r[15] || '',
+    chat:            chatMap[r[0]] || []
+  }))
+  .filter(r => r.daripadaId === userId || r.kepadaId === userId)
+  .reverse();
+}
+
+function hantarSerahanDalaman(data) {
+  autoSetupDatabase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  _ensureSerahanDalamanSheet(ss);
+  const sheet = ss.getSheetByName(SHEET_NAME_DALAMAN);
+
+  const now = new Date().toLocaleString('ms-MY', {
+    day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'
+  });
+  const row = [
+    data.id, data.daripadaId, data.daripadaNama, data.daripadaPeranan,
+    data.kepadaId, data.kepadaNama, data.kepadaPeranan,
+    data.perihal, data.catatan || '-', 'Baharu',
+    now, '-', '-', '-', now,
+    data.jenisDokumen || '-'
+  ];
+  sheet.appendRow(row);
+  return dapatkanSerahanDalaman(data.daripadaId, data.daripadaPeranan);
+}
+
+function tandaBacaSerahanDalaman(sdId, userId, peranan) {
+  autoSetupDatabase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  _ensureSerahanDalamanSheet(ss);
+  const sheet = ss.getSheetByName(SHEET_NAME_DALAMAN);
+  const data  = sheet.getDataRange().getValues();
+  const now   = new Date().toLocaleString('ms-MY', {
+    day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'
+  });
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === sdId && data[i][4] === userId && data[i][9] === 'Baharu') {
+      sheet.getRange(i+1, 10).setValue('Dibaca');
+      sheet.getRange(i+1, 12).setValue(now);
+      sheet.getRange(i+1, 15).setValue(now);
+      break;
+    }
+  }
+  return dapatkanSerahanDalaman(userId, peranan);
+}
+
+// Pengesahan penerimaan oleh penerima (USM atau Unit Kejururawatan) — status akhir "Disahkan"
+function sahkanSerahanDalaman(sdId, userId, peranan, catatan) {
+  autoSetupDatabase();
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  _ensureSerahanDalamanSheet(ss);
+  const sheet = ss.getSheetByName(SHEET_NAME_DALAMAN);
+  const data  = sheet.getDataRange().getValues();
+  const now   = new Date().toLocaleString('ms-MY', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === sdId) {
+      sheet.getRange(i+1, 10).setValue('Disahkan');       // Status
+      sheet.getRange(i+1, 13).setValue(now);              // Tarikh_Sahkan
+      sheet.getRange(i+1, 14).setValue(catatan || '-');   // Catatan_Sahkan
+      sheet.getRange(i+1, 15).setValue(now);              // Tarikh_Kemaskini
+      break;
+    }
+  }
+  return dapatkanSerahanDalaman(userId, peranan);
+}
+
+// Tambah mesej chat — disimpan kekal dalam sheet berasingan, terikat kepada ID_Serahan
+// Chat akan terus dipaparkan walaupun status Serahan telah "Disahkan" (selesai)
+function tambahChatSD(sdId, userId, peranan, chat) {
+  autoSetupDatabase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  _ensureSerahanDalamanSheet(ss);
+  const chatSheet = ss.getSheetByName(SHEET_NAME_SD_CHAT);
+  const now = new Date().toLocaleString('ms-MY', {
+    day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'
+  });
+  chatSheet.appendRow([sdId, userId, chat.nama, peranan, chat.teks, chat.masa || now]);
+
+  // Kemaskini Tarikh_Kemaskini pada rekod induk
+  const sheet = ss.getSheetByName(SHEET_NAME_DALAMAN);
+  const data  = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === sdId) { sheet.getRange(i+1, 15).setValue(now); break; }
+  }
+  return dapatkanSerahanDalaman(userId, peranan);
+}
+
+// ============================================================
+// TAMBAHAN: LUPA KATA LALUAN (self-service reset)
+// Letak kod ini SELEPAS fungsi tukarKataLaluan() sedia ada
+// dalam Code.gs anda.
+// ============================================================
+
+// Semak sama ada emel wujud & akaun aktif — Langkah 1 "Lupa Kata Laluan"
+function semakEmelWujud(emel) {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PENGGUNA);
+  const rows  = sheet.getDataRange().getValues();
+  const emelBersih = String(emel || '').trim().toLowerCase();
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][5]).trim().toLowerCase() === emelBersih) {   // kolum 6 = Emel
+      const status = String(rows[i][9] || STATUS_AKAUN.AKTIF).trim() || STATUS_AKAUN.AKTIF; // kolum 10 = Status_Akaun
+      if (status === STATUS_AKAUN.MENUNGGU) {
+        return { success: false, message: 'Akaun ini masih menunggu kelulusan Pentadbir Sistem.' };
+      }
+      if (status === STATUS_AKAUN.DITOLAK) {
+        return { success: false, message: 'Akaun ini tidak aktif. Sila hubungi Pentadbir Sistem.' };
+      }
+      return { success: true, nama: rows[i][1] };
+    }
+  }
+  return { success: false, message: 'Emel ini tidak ditemui dalam sistem.' };
+}
+
+// Tetapkan semula kata laluan terus melalui emel (tanpa kata laluan lama) — Langkah 2
+function resetKataLaluanEmel(emel, passBaharu) {
+  autoSetupDatabase();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PENGGUNA);
+  const rows  = sheet.getDataRange().getValues();
+  const emelBersih = String(emel || '').trim().toLowerCase();
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][5]).trim().toLowerCase() === emelBersih) {
+      const status = String(rows[i][9] || STATUS_AKAUN.AKTIF).trim() || STATUS_AKAUN.AKTIF;
+      if (status === STATUS_AKAUN.MENUNGGU || status === STATUS_AKAUN.DITOLAK) {
+        return { success: false, message: 'Akaun ini tidak aktif. Sila hubungi Pentadbir Sistem.' };
+      }
+      sheet.getRange(i + 1, 3).setValue(passBaharu);                 // kolum 3 = Kata_Laluan
+      sheet.getRange(i + 1, 9).setValue(new Date().toISOString());   // kolum 9 = Tarikh_Kemaskini
+      return { success: true, nama: rows[i][1] };
+    }
+  }
+  return { success: false, message: 'Emel ini tidak ditemui dalam sistem.' };
+}

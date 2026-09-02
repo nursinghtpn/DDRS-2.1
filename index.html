@@ -1972,6 +1972,55 @@
 <!-- ═══════════ SCRIPT ═══════════ -->
 <script>
 // ─────────────────────────────────────────────
+// KONFIGURASI APPS SCRIPT WEB APP (untuk deployment di Vercel/GitHub Pages)
+// ─────────────────────────────────────────────
+// Isikan URL deployment Web App Google Apps Script anda di sini.
+// Cara dapatkan: Apps Script Editor → Deploy → Manage deployments → salin "Web app URL".
+// Contoh: 'https://script.google.com/macros/s/AKfycb.../exec'
+//
+// JIKA DIKOSONGKAN ('') — sistem akan guna MOCK GAS (data demo dalam memori,
+// sesuai untuk pratonton/demo visual sahaja, TIDAK simpan data kekal).
+// JIKA DIISI — sistem akan sambung sebenar ke Code.gs & Google Sheets anda melalui fetch().
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxuoEleH_NYCQY3j0BlRwrGc7DopgbMDFC22kLhDhNzqjI3Ce6a_44MBObakOaGqwTb/exec';
+
+// ─────────────────────────────────────────────
+// GAS-COMPAT PROXY — meniru API google.script.run menggunakan fetch()
+// Membolehkan Index.html ini dihoskan di luar Google Apps Script (cth: Vercel)
+// tanpa perlu ubah mana-mana panggilan google.script.run sedia ada dalam kod.
+// ─────────────────────────────────────────────
+if (APPS_SCRIPT_URL && typeof google === 'undefined') {
+  function _buatGasRunProxy() {
+    const state = { success: null, fail: null };
+    const proxy = new Proxy({}, {
+      get(target, fn) {
+        if (fn === 'withSuccessHandler') return (cb) => { state.success = cb; return proxy; };
+        if (fn === 'withFailureHandler') return (cb) => { state.fail = cb; return proxy; };
+        if (fn === 'withUserObject')     return () => proxy; // tidak digunakan, kekal untuk keserasian API
+        // Sebarang nama lain dianggap nama fungsi Code.gs untuk dipanggil dari jauh
+        return (...args) => {
+          fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            // Content-Type: text/plain mengelak "preflight" CORS (Apps Script tidak layan permintaan OPTIONS)
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ fn, args })
+          })
+            .then(res => res.json())
+            .then(json => {
+              if (json && json.ralat) { if (state.fail) state.fail(new Error(json.ralat)); return; }
+              if (state.success) state.success(json ? json.hasil : undefined);
+            })
+            .catch(err => { if (state.fail) state.fail(err); });
+        };
+      }
+    });
+    return proxy;
+  }
+  // "get run()" — proxy baharu setiap kali diakses, supaya setiap rantaian
+  // withSuccessHandler/withFailureHandler bermula bersih (padan gelagat google.script.run sebenar)
+  window.google = { script: { get run() { return _buatGasRunProxy(); } } };
+}
+
+// ─────────────────────────────────────────────
 // MOCK GAS (untuk preview – buang di production)
 // ─────────────────────────────────────────────
 if (typeof google === 'undefined' || !google.script) {

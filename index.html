@@ -4,6 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>DDRS – Sistem Pengurusan Dokumen</title>
+
+  <!-- ═══════════ PWA: Ikon Aplikasi & Manifest ═══════════ -->
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/x-icon" href="./favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <meta name="theme-color" content="#1e3a8a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DDRS">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -238,6 +251,12 @@
         <p class="text-center text-[11px] text-slate-400 mt-5">Hakcipta © Unit Kejururawatan HTPN. 2026–2028.<br>created by MN Hafiz</p>
       </div>
     </div>
+
+    <!-- Butang Muat Turun Aplikasi (PWA) -->
+    <button id="btnInstallApp" onclick="pasangAplikasiDDRS()"
+      class="hidden mt-4 w-full py-3 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 text-white font-bold rounded-2xl text-sm transition-all items-center justify-center gap-2">
+      <i class="fas fa-mobile-alt"></i> Muat Turun Aplikasi ke Telefon
+    </button>
   </div>
 </div>
 
@@ -426,6 +445,43 @@
         <button onclick="closeModal('modalLupaPassword')"
           class="w-full mt-3 py-2.5 text-slate-500 hover:text-slate-700 font-semibold text-sm transition-all">
           Batal
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: PASANG APLIKASI (iOS) ═══════════ -->
+<div id="modalInstallIOS" class="hidden fixed inset-0 z-[110] modal-bg flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden text-center">
+    <div class="bg-gradient-to-r from-blue-700 to-blue-600 px-6 pt-8 pb-10 relative overflow-hidden">
+      <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10"></div>
+      <div class="absolute -bottom-8 -left-4 w-24 h-24 rounded-full bg-white/10"></div>
+      <div class="relative w-16 h-16 mx-auto bg-white rounded-full flex items-center justify-center shadow-lg">
+        <i class="fas fa-mobile-alt text-blue-600 text-2xl"></i>
+      </div>
+    </div>
+    <div class="px-7 -mt-5 pb-7">
+      <div class="bg-white rounded-2xl shadow-lg px-5 py-6 text-left">
+        <h3 class="font-extrabold text-slate-800 text-lg text-center">Pasang Aplikasi DDRS</h3>
+        <p class="text-sm text-slate-500 mt-2 text-center">Ikuti 3 langkah mudah ini di Safari untuk pasang DDRS ke skrin utama:</p>
+        <div class="mt-5 space-y-3">
+          <div class="flex items-center gap-3">
+            <span class="w-7 h-7 flex-shrink-0 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
+            <p class="text-sm text-slate-700">Tekan ikon <i class="fas fa-arrow-up-from-bracket mx-1 text-blue-600"></i> <b>Share</b> (Kongsi) di bar bawah Safari</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-7 h-7 flex-shrink-0 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
+            <p class="text-sm text-slate-700">Tatal ke bawah, pilih <b>"Add to Home Screen"</b></p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-7 h-7 flex-shrink-0 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
+            <p class="text-sm text-slate-700">Tekan <b>"Add"</b> — ikon DDRS akan muncul di skrin utama anda</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modalInstallIOS')"
+          class="w-full mt-5 py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-blue-100">
+          Faham
         </button>
       </div>
     </div>
@@ -1971,6 +2027,57 @@
 
 <!-- ═══════════ SCRIPT ═══════════ -->
 <script>
+// ─────────────────────────────────────────────
+// PWA — Pemasangan Aplikasi Mudah Alih
+// ─────────────────────────────────────────────
+// Daftar service worker (membolehkan aplikasi dipasang / "installable")
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
+let _deferredInstallPrompt = null;
+
+// Chrome/Edge/Android: tangkap event "boleh dipasang" dan papar butang
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  const btn = document.getElementById('btnInstallApp');
+  if (btn) { btn.classList.remove('hidden'); btn.classList.add('flex'); }
+});
+
+// iOS Safari tidak sokong beforeinstallprompt — papar butang + tunjuk arahan manual
+(function () {
+  const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+  const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (isIOS && !isInStandaloneMode) {
+    const btn = document.getElementById('btnInstallApp');
+    if (btn) { btn.classList.remove('hidden'); btn.classList.add('flex'); }
+  }
+})();
+
+// Aplikasi sudah dipasang — sembunyikan butang
+window.addEventListener('appinstalled', () => {
+  const btn = document.getElementById('btnInstallApp');
+  if (btn) btn.classList.add('hidden');
+  _deferredInstallPrompt = null;
+});
+
+function pasangAplikasiDDRS() {
+  const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+  if (_deferredInstallPrompt) {
+    _deferredInstallPrompt.prompt();
+    _deferredInstallPrompt.userChoice.finally(() => { _deferredInstallPrompt = null; });
+  } else if (isIOS) {
+    document.getElementById('modalInstallIOS').classList.remove('hidden');
+  } else {
+    if (typeof toast === 'function') {
+      toast('info', 'Pasang Aplikasi', 'Guna menu pelayar (⋮) → "Add to Home screen" / "Install app" untuk pasang DDRS.');
+    }
+  }
+}
+
 // ─────────────────────────────────────────────
 // KONFIGURASI APPS SCRIPT WEB APP (untuk deployment di Vercel/GitHub Pages)
 // ─────────────────────────────────────────────

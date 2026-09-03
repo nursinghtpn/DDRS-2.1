@@ -3271,9 +3271,20 @@ function renderDashboardUser() {
 
 function renderStatus() {
   const term     = (document.getElementById('statusSearch')?.value || '').toLowerCase();
-  // Tapis mengikut unit/wad atau mengikut ID pengguna
-  const unitDocs = currentUser.unit
-    ? db.filter(d => d.unitPenghantar === currentUser.unit)
+  // Tapis mengikut unit/wad (case-insensitive, abaikan jarak) atau mengikut ID pengguna
+  const unitSaya = (currentUser.unit || '').trim().toLowerCase();
+  // Peta ID pengguna -> unit SEMASA (dari profil terkini), untuk dokumen lama yang
+  // Unit_Penghantar tersimpan mungkin kosong/tidak segerak dengan profil semasa
+  const unitPenggunaMap = {};
+  (usersData || []).forEach(u => { unitPenggunaMap[u.id] = (u.unit || '').trim().toLowerCase(); });
+  const unitDocs = unitSaya
+    ? db.filter(d => {
+        const unitDok = (d.unitPenghantar || '').trim().toLowerCase();
+        if (unitDok === unitSaya) return true;               // (1) unit pada dokumen sepadan
+        if (unitDok && unitDok !== '-') return false;         // dokumen ada unit lain yang jelas — bukan unit kita
+        // (2) fallback: unit pada dokumen kosong/'-' — semak unit SEMASA penghantar
+        return unitPenggunaMap[d.idPenghantar] === unitSaya;
+      })
     : db.filter(d => d.idPenghantar === currentUser.id || d.namaPenghantar === currentUser.name);
   const myDocs   = term
     ? unitDocs.filter(d => d.namaDokumen.toLowerCase().includes(term) || d.id.toLowerCase().includes(term))

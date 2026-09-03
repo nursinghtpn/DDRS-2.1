@@ -283,8 +283,8 @@
         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Penuh <span class="text-red-500">*</span></label>
         <div class="relative">
           <i class="fas fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-          <input type="text" id="daftarNama" required placeholder="Nama penuh seperti dalam IC"
-            class="w-full pl-10 pr-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none transition-colors">
+          <input type="text" id="daftarNama" required placeholder="NAMA PENUH SEPERTI DALAM IC" oninput="_autoUpper(this)"
+            class="w-full pl-10 pr-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none transition-colors uppercase">
         </div>
       </div>
       <div>
@@ -2749,7 +2749,7 @@ function openModalDaftar() {
 
 function submitDaftar(e) {
   e.preventDefault();
-  const nama     = document.getElementById('daftarNama').value.trim();
+  const nama     = document.getElementById('daftarNama').value.trim().toUpperCase();
   const jawatan  = document.getElementById('daftarJawatan').value.trim();
   const unit     = (document.getElementById('daftarUnit')?.value || '').trim();
   const tel      = document.getElementById('daftarTel').value.trim();
@@ -3984,7 +3984,11 @@ function renderSemakan() {
               class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-indigo-100 flex items-center gap-2 whitespace-nowrap">
               <i class="fas fa-search-plus"></i> Buat Semakan &amp; Hantar USM
             </button>
-            <p class="text-[10px] text-indigo-500 text-center font-medium">Perlu dihantar ke USM</p>
+            <button onclick="tandaSelesaiTanpaUSM('${d.id}')"
+              class="px-5 py-2 bg-white hover:bg-green-50 border-2 border-green-300 text-green-700 font-bold rounded-xl text-xs transition-all flex items-center gap-2 whitespace-nowrap">
+              <i class="fas fa-check-double"></i> Selesai (Tiada USM)
+            </button>
+            <p class="text-[10px] text-slate-400 text-center font-medium">Pilih ikut keperluan dokumen</p>
           ` : isKeUSM ? `
             <button onclick="cetakSlipPenghantaran('${d.id}')"
               class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-amber-100 flex items-center gap-2 whitespace-nowrap">
@@ -4005,6 +4009,30 @@ function renderSemakan() {
 // ─────────────────────────────────────────────
 // MODAL SEMAKAN + HANTAR USM
 // ─────────────────────────────────────────────
+async function tandaSelesaiTanpaUSM(docId) {
+  const d = db.find(x => x.id === docId);
+  if (!d) return;
+  const ok = await _confirm(
+    'Dokumen akan terus ditanda <b>Selesai</b> tanpa dihantar ke Unit Sumber Manusia. Guna pilihan ini hanya untuk dokumen yang memang tidak memerlukan tindakan USM.',
+    'Tandakan Selesai Tanpa USM?', 'tanya', 'Ya, Tandakan Selesai'
+  );
+  if (!ok) return;
+
+  const now = _fmtTarikhMasa(new Date());
+  _optimistic(
+    () => {
+      d.status = 'Selesai';
+      d.namaUSM = currentUser.name;
+      d.tarikhUSM = now;
+      d.catatanUSM = 'Selesai terus oleh Unit Kejururawatan (tiada tindakan USM diperlukan)';
+      logData.unshift({logId:'LOG'+Date.now(), idDokumen:docId, namaDokumen:d.namaDokumen, pengguna:currentUser.name, peranan:'penyemak', tindakan:'PENYEMAK_SELESAI', catatan:'Ditandakan Selesai terus tanpa hantar ke USM', tarikhMasa:now});
+    },
+    'selesaiTanpaUSM', [docId, currentUser.name],
+    'Dokumen ditandakan Selesai.',
+    'Selesai'
+  );
+}
+
 function openModalSemakan(docId) {
   const d = db.find(x => x.id === docId);
   if (!d) return;
@@ -4739,9 +4767,9 @@ function _renderPenggunaList(users) {
     return `
     <div class="grid grid-cols-12 gap-2 md:gap-3 items-center px-3 md:px-5 py-3 md:py-3.5 hover:bg-slate-50 transition-colors">
       <div class="col-span-4 flex items-center gap-3 min-w-0">
-        <div class="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0">${u.name.charAt(0)}</div>
+        <div class="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600 text-sm flex-shrink-0">${(u.name||'-').charAt(0).toUpperCase()}</div>
         <div class="min-w-0">
-          <p class="text-sm font-bold text-slate-800 truncate">${u.name}</p>
+          <p class="text-sm font-bold text-slate-800 truncate">${(u.name||'-').toUpperCase()}</p>
           <p class="text-xs text-slate-400 truncate">${u.emel || u.id}</p>
         </div>
       </div>
@@ -4770,9 +4798,9 @@ function _renderPermohonanMenunggu(list) {
 
   setHTML(container, list.map(p => `
     <div class="flex items-center gap-4 px-5 py-3.5 flex-wrap">
-      <div class="w-9 h-9 rounded-full bg-amber-200 flex items-center justify-center font-bold text-amber-800 text-sm flex-shrink-0">${p.name.charAt(0)}</div>
+      <div class="w-9 h-9 rounded-full bg-amber-200 flex items-center justify-center font-bold text-amber-800 text-sm flex-shrink-0">${(p.name||'-').charAt(0).toUpperCase()}</div>
       <div class="flex-1 min-w-[180px]">
-        <p class="text-sm font-bold text-slate-800">${p.name}</p>
+        <p class="text-sm font-bold text-slate-800">${(p.name||'-').toUpperCase()}</p>
         <p class="text-xs text-slate-500">${p.emel}${p.jawatan ? ' &bull; ' + p.jawatan : ''}${p.tel ? ' &bull; ' + p.tel : ''}</p>
       </div>
       <div class="flex items-center gap-2 flex-shrink-0">

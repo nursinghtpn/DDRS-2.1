@@ -2885,6 +2885,23 @@ function _syncNow() {
   if (currentUser && currentUser.role === 'admin') {
     _gasCall('dapatkanPermohonanMenunggu').then(p => _updateBadgePermohonan((p || []).length));
   }
+
+  // Sync Serahan Dalaman (perbincangan/chat) — supaya lencana loceng notifikasi
+  // sentiasa terkini secara langsung tanpa perlu buka tab Serahan Dalaman dahulu
+  if (currentUser) {
+    _gasCall('dapatkanSerahanDalaman', currentUser.id, currentUser.role).then(sd => {
+      if (!sd) return;
+      serahanDalamanData = sd;
+      _updateNotifChatBadge();
+      const active = document.querySelector('.tab-content.active');
+      if (active && active.id === 'tab-serahan_dalaman') {
+        _renderSDDashboard();
+        _updateBadgeSD();
+        _renderListSD();
+        _renderSDLog();
+      }
+    });
+  }
 }
 
 function refreshCurrentTab() {
@@ -2900,18 +2917,8 @@ function refreshCurrentTab() {
   // kerana pengguna mungkin sedang mengisi borang dan data akan hilang
   const SKIP_SYNC = ['profil', 'tetapan', 'hantar', 'serahan_dalaman'];
   if (SKIP_SYNC.includes(tabId)) {
-    // Khas untuk serahan_dalaman: kemaskini senarai kanan SAHAJA (bukan form kiri)
-    // supaya data terkini dipapar tanpa reset dropdown yang sedang dipilih
-    if (tabId === 'serahan_dalaman') {
-      google.script.run.withSuccessHandler(data => {
-        if (!data) return;
-        serahanDalamanData = data;
-        _renderSDDashboard();
-        _updateBadgeSD();
-        _renderListSD();
-        _renderSDLog();
-      }).dapatkanSerahanDalaman(currentUser.id, currentUser.role);
-    }
+    // Nota: Serahan Dalaman (senarai kanan + lencana notifikasi) sudah disegerakkan
+    // secara berasingan setiap 5 saat dalam _syncNow() — elak panggilan berganda di sini.
     return;
   }
 
@@ -5200,6 +5207,7 @@ document.addEventListener('click', (e) => {
 });
 
 function _renderNotifChatDropdown() {
+  _updateNotifChatBadge();
   const list = document.getElementById('notifChatList');
   if (!list) return;
   const senarai = _senaraiChatBelumBacaSD();

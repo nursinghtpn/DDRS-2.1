@@ -2045,6 +2045,18 @@
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
+    // Semak kemas kini setiap kali aplikasi dibuka (penting untuk mod PWA/dipasang,
+    // supaya versi baharu dikesan serta-merta walaupun tanpa tutup aplikasi dahulu)
+    navigator.serviceWorker.getRegistration().then((reg) => reg && reg.update());
+  });
+
+  // Bila Service Worker baharu ambil alih (versi dikemas kini) — segar semula
+  // secara automatik supaya app shell & logik terkini digunakan serta-merta.
+  let _swSudahRefresh = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (_swSudahRefresh) return;
+    _swSudahRefresh = true;
+    window.location.reload();
   });
 }
 

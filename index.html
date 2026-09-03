@@ -3502,6 +3502,7 @@ function bukaDetailStatus(docId) {
     USM_TERIMA:       { bg:'bg-green-50',  border:'border-green-200',  icon:'fa-check-double',       ic:'text-green-600',  label:'Diterima – Unit Sumber Manusia' },
     USM_TOLAK:        { bg:'bg-red-50',    border:'border-red-200',    icon:'fa-ban',                ic:'text-red-500',    label:'Ditolak – Unit Sumber Manusia' },
     USM_QUERY:        { bg:'bg-orange-50', border:'border-orange-300', icon:'fa-question-circle',    ic:'text-orange-600', label:'Query – Unit Sumber Manusia' },
+    PENYEMAK_SELESAI: { bg:'bg-green-50',  border:'border-green-200',  icon:'fa-check-double',       ic:'text-green-600',  label:'Selesai' },
   };
 
   const _cleanCatatan = (tindakan, catatan) => {
@@ -4024,8 +4025,8 @@ async function tandaSelesaiTanpaUSM(docId) {
       d.status = 'Selesai';
       d.namaUSM = currentUser.name;
       d.tarikhUSM = now;
-      d.catatanUSM = 'Selesai terus oleh Unit Kejururawatan (tiada tindakan USM diperlukan)';
-      logData.unshift({logId:'LOG'+Date.now(), idDokumen:docId, namaDokumen:d.namaDokumen, pengguna:currentUser.name, peranan:'penyemak', tindakan:'PENYEMAK_SELESAI', catatan:'Ditandakan Selesai terus tanpa hantar ke USM', tarikhMasa:now});
+      d.catatanUSM = '-';
+      logData.unshift({logId:'LOG'+Date.now(), idDokumen:docId, namaDokumen:d.namaDokumen, pengguna:currentUser.name, peranan:'penyemak', tindakan:'PENYEMAK_SELESAI', catatan:'-', tarikhMasa:now});
     },
     'selesaiTanpaUSM', [docId, currentUser.name],
     'Dokumen ditandakan Selesai.',
@@ -4380,6 +4381,7 @@ function bukaDetailRekod(docId) {
     USM_TERIMA:       { bg:'bg-green-50',  border:'border-green-200',  icon:'fa-check-double',       ic:'text-green-600',  label:'Diterima – Unit Sumber Manusia' },
     USM_TOLAK:        { bg:'bg-red-50',    border:'border-red-200',    icon:'fa-ban',                ic:'text-red-500',    label:'Ditolak – Unit Sumber Manusia' },
     USM_QUERY:        { bg:'bg-orange-50', border:'border-orange-300', icon:'fa-question-circle',    ic:'text-orange-600', label:'Query – Unit Sumber Manusia' },
+    PENYEMAK_SELESAI: { bg:'bg-green-50',  border:'border-green-200',  icon:'fa-check-double',       ic:'text-green-600',  label:'Selesai' },
   };
 
   const _row = (label, value, extra='') => value && value !== '-'

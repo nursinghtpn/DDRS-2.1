@@ -3271,12 +3271,17 @@ function renderDashboardUser() {
 
 function renderStatus() {
   const term     = (document.getElementById('statusSearch')?.value || '').toLowerCase();
-  // Tapis mengikut unit/wad (case-insensitive, abaikan jarak) atau mengikut ID pengguna
-  const unitSaya = (currentUser.unit || '').trim().toLowerCase();
   // Peta ID pengguna -> unit SEMASA (dari profil terkini), untuk dokumen lama yang
   // Unit_Penghantar tersimpan mungkin kosong/tidak segerak dengan profil semasa
   const unitPenggunaMap = {};
   (usersData || []).forEach(u => { unitPenggunaMap[u.id] = (u.unit || '').trim().toLowerCase(); });
+
+  // PENTING: rujuk unit TERKINI pengguna (dari usersData/profil pelayan) dahulu —
+  // currentUser.unit dalam sesi (sessionStorage) boleh jadi LAPUK jika profil
+  // dikemas kini SELEPAS log masuk (session tidak auto-refresh medan ini).
+  const unitSaya = (unitPenggunaMap[currentUser.id] || (currentUser.unit || '').trim().toLowerCase());
+  if (unitSaya && !currentUser.unit) currentUser.unit = unitSaya; // segerak semula sesi
+
   const unitDocs = unitSaya
     ? db.filter(d => {
         const unitDok = (d.unitPenghantar || '').trim().toLowerCase();

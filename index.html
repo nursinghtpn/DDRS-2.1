@@ -528,6 +528,9 @@
         <button onclick="gotoTab('status')" id="btn-status" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all text-sm font-semibold">
           <i class="fas fa-search w-5 text-slate-400"></i> Semak Status
         </button>
+        <button onclick="gotoTab('despatch_terima')" id="btn-despatch_terima" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all text-sm font-semibold">
+          <i class="fas fa-inbox w-5 text-slate-400"></i> Despatch Diterima
+        </button>
       </div>
 
       <!-- PENYEMAK MENU -->
@@ -544,6 +547,9 @@
         <button onclick="gotoTab('serahan_dalaman')" id="btn-serahan_dalaman" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all text-sm font-semibold">
           <i class="fas fa-exchange-alt w-5 text-slate-400"></i> Serahan Dalaman
           <span id="badgeSerahanDalaman" class="hidden ml-auto bg-teal-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
+        </button>
+        <button onclick="gotoTab('despatch_wad')" id="btn-despatch_wad" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all text-sm font-semibold">
+          <i class="fas fa-dolly w-5 text-slate-400"></i> Despatch ke Wad/Unit
         </button>
         <button onclick="gotoTab('dashboard')" id="btn-dashboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all text-sm font-semibold">
           <i class="fas fa-chart-bar w-5 text-slate-400"></i> Dashboard
@@ -589,6 +595,9 @@
         </button>
         <button onclick="gotoTab('semakan')" id="btn-adm-semakan" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all text-sm font-semibold">
           <i class="fas fa-tasks w-5 text-slate-400"></i> Semakan Dokumen
+        </button>
+        <button onclick="gotoTab('despatch_wad')" id="btn-adm-despatch_wad" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all text-sm font-semibold">
+          <i class="fas fa-dolly w-5 text-slate-400"></i> Despatch ke Wad/Unit
         </button>
         <button onclick="gotoTab('semua_rekod')" id="btn-adm-rekod" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all text-sm font-semibold">
           <i class="fas fa-database w-5 text-slate-400"></i> Semua Rekod
@@ -1096,6 +1105,109 @@
         </div>
       </div>
 
+      <!-- ═══════════ DESPATCH KE WAD/UNIT (Unit Kejururawatan) ═══════════ -->
+      <div id="tab-despatch_wad" class="tab-content space-y-5">
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="dwDashStats"></div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+          <!-- KIRI: Form despatch -->
+          <div class="lg:col-span-2 space-y-4">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div class="h-1 bg-gradient-to-r from-sky-500 to-blue-500"></div>
+              <div class="px-5 pt-4 pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                  <i class="fas fa-dolly text-sky-500"></i> Borang Despatch Dokumen
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Unit Kejururawatan → Wad/Unit</p>
+              </div>
+              <div class="p-5 space-y-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Daripada</label>
+                  <div class="relative">
+                    <i class="fas fa-user-circle absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="dwPenghantar" readonly
+                      class="w-full pl-10 py-2.5 border-2 border-slate-100 bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 cursor-not-allowed">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Wad/Unit Tujuan <span class="text-red-500">*</span></label>
+                  <div class="relative">
+                    <i class="fas fa-hospital absolute left-3.5 top-1/2 -translate-y-1/2 text-sky-400 text-sm pointer-events-none"></i>
+                    <select id="dwWadTujuan" class="w-full pl-10 pr-8 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium focus:border-sky-500 focus:outline-none transition-colors appearance-none bg-white">
+                      <option value="" disabled selected>— Pilih Wad/Unit —</option>
+                    </select>
+                    <i class="fas fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jenis Dokumen <span class="text-slate-400 font-normal normal-case">(pilihan)</span></label>
+                  <div class="relative">
+                    <i class="fas fa-tag absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-400 text-sm pointer-events-none z-10"></i>
+                    <input type="text" id="dwJenisDokumenCari" placeholder="— Pilih atau taip untuk cari —" autocomplete="off"
+                      class="w-full pl-10 pr-8 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium focus:border-sky-500 focus:outline-none transition-colors bg-white cursor-pointer">
+                    <select id="dwJenisDokumen" onchange="_toggleJenisDokumenLainDW()" class="hidden">
+                      <option value="">— Pilih Jenis Dokumen —</option>
+                    </select>
+                    <i class="fas fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                    <div id="dwJenisDokumenDropdown" class="hidden absolute z-40 mt-1 w-full bg-white border-2 border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto"></div>
+                  </div>
+                  <div id="dwJenisDokumenLainWrap" class="hidden relative mt-2">
+                    <i class="fas fa-pen absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-400 text-sm pointer-events-none"></i>
+                    <input type="text" id="dwJenisDokumenLain" placeholder="Nyatakan jenis dokumen..." oninput="_autoTitleCase(this)"
+                      class="w-full pl-10 pr-3 py-2.5 border-2 border-indigo-200 rounded-xl text-sm font-medium focus:border-sky-500 focus:outline-none transition-colors">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Perihal Dokumen <span class="text-red-500">*</span></label>
+                  <div class="relative">
+                    <i class="fas fa-file-alt absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                    <textarea id="dwPerihal" rows="3" placeholder="NYATAKAN PERIHAL DOKUMEN YANG DIDESPATCH..."
+                      oninput="_autoUpper(this)"
+                      class="w-full pl-10 pr-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:border-sky-500 focus:outline-none transition-colors resize-none uppercase"></textarea>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan <span class="text-slate-400 font-normal normal-case">(pilihan)</span></label>
+                  <div class="relative">
+                    <i class="fas fa-comment-dots absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                    <textarea id="dwCatatan" rows="2" placeholder="Arahan atau maklumat tambahan..."
+                      class="w-full pl-10 pr-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:border-sky-500 focus:outline-none transition-colors resize-none"></textarea>
+                  </div>
+                </div>
+                <button onclick="hantarDespatchWad()"
+                  class="w-full py-2.5 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-100">
+                  <i class="fas fa-paper-plane"></i> Hantar Despatch
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- KANAN: Senarai despatch -->
+          <div class="lg:col-span-3 space-y-3">
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-2 flex-wrap">
+              <div class="relative flex-1 min-w-[180px]">
+                <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                <input type="text" id="dwCariWad" placeholder="Cari wad/unit atau perihal..." oninput="renderDespatchWad()"
+                  class="w-full pl-9 pr-3 py-2 border-2 border-slate-200 rounded-lg text-xs font-medium focus:border-sky-500 focus:outline-none transition-colors">
+              </div>
+            </div>
+            <div id="listDespatchWad" class="space-y-2"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ═══════════ DESPATCH DITERIMA (Kakitangan) ═══════════ -->
+      <div id="tab-despatch_terima" class="tab-content">
+        <div class="bg-white border border-slate-200 rounded-xl p-3 mb-4 flex items-center gap-2">
+          <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+          <input type="text" id="dtCari" placeholder="Cari perihal dokumen..." oninput="renderDespatchTerima()"
+            class="w-full pl-3 pr-3 py-2 border-2 border-slate-200 rounded-lg text-xs font-medium focus:border-sky-500 focus:outline-none transition-colors">
+        </div>
+        <div id="listDespatchTerima" class="space-y-2"></div>
+      </div>
 
       <div id="tab-semua_rekod" class="tab-content">
         <div class="mb-4 flex flex-wrap gap-2 items-center">
@@ -2519,6 +2631,7 @@ let jenisDokumenData = [];
 let jawatanData = [];
 let unitData = [];
 let serahanDalamanData = [];
+let despatchWadData = [];
 let syncTimer;
 
 // ─────────────────────────────────────────────
@@ -2950,6 +3063,8 @@ const PAGE_META = {
   inbox:       { title:'Inbox', sub:'Dokumen baharu menunggu tindakan penerimaan' },
   semakan:     { title:'Semakan Unit Kejururawatan', sub:'Buat semakan dan hantar ke Unit Sumber Manusia' },
   serahan_dalaman: { title:'Serahan Dalaman', sub:'Urusan dokumen antara Unit Kejururawatan dan Unit Sumber Manusia' },
+  despatch_wad:    { title:'Despatch ke Wad/Unit', sub:'Hantar dokumen daripada Unit Kejururawatan kepada wad/unit' },
+  despatch_terima: { title:'Despatch Diterima', sub:'Dokumen yang dihantar oleh Unit Kejururawatan kepada wad/unit anda' },
   usm_inbox:   { title:'Inbox – Unit Sumber Manusia', sub:'Dokumen menunggu pengesahan akhir' },
   dashboard:   { title:'Dashboard', sub:'Paparan ringkasan dan statistik dokumen' },
   semua_rekod: { title:'Semua Rekod', sub:'Rekod penuh pergerakan semua dokumen' },
@@ -2986,6 +3101,8 @@ function renderTabContent(tabId) {
     case 'inbox':           renderInbox(); break;
     case 'semakan':         renderSemakan(); break;
     case 'serahan_dalaman': renderSerahanDalaman(); break;
+    case 'despatch_wad':    renderDespatchWad(); break;
+    case 'despatch_terima': renderDespatchTerima(); break;
     case 'usm_inbox':       renderUSMInbox(); break;
     case 'dashboard':       renderDashboard(); break;
     case 'semua_rekod':     renderRekod(); break;
@@ -5440,6 +5557,287 @@ function _updateBadgeSD() {
   });
   const bb = document.getElementById('sdBadgeBelumBaca');
   if (bb) perlu > 0 ? (bb.textContent = perlu, bb.classList.remove('hidden')) : bb.classList.add('hidden');
+}
+
+
+// ═══════════════════════════════════════════════
+// DESPATCH KE WAD/UNIT (Unit Kejururawatan → Wad/Unit)
+// ═══════════════════════════════════════════════
+function _toggleJenisDokumenLainDW() {
+  const sel  = document.getElementById('dwJenisDokumen');
+  const wrap = document.getElementById('dwJenisDokumenLainWrap');
+  const inp  = document.getElementById('dwJenisDokumenLain');
+  if (!sel || !wrap || !inp) return;
+  if (sel.value === 'Lain-lain Dokumen') {
+    wrap.classList.remove('hidden');
+  } else {
+    wrap.classList.add('hidden');
+    inp.value = '';
+  }
+}
+
+function renderDespatchWad() {
+  const dwPenghantar = document.getElementById('dwPenghantar');
+  if (dwPenghantar) dwPenghantar.value = currentUser.name;
+
+  const dwWad = document.getElementById('dwWadTujuan');
+  if (dwWad && document.activeElement !== dwWad) {
+    const _isiWad = () => {
+      setHTML(dwWad, `<option value="" disabled selected>— Pilih Wad/Unit —</option>` +
+        unitData.map(u => `<option value="${u}">${u}</option>`).join(''));
+    };
+    if (unitData.length > 0) {
+      _isiWad();
+    } else {
+      google.script.run.withSuccessHandler(d => { unitData = d || []; _isiWad(); }).dapatkanUnit();
+    }
+  }
+
+  const dwJenis = document.getElementById('dwJenisDokumen');
+  if (dwJenis && document.activeElement !== dwJenis) {
+    const _isiJenisDW = () => {
+      dwJenis.innerHTML = `<option value="">— Pilih Jenis Dokumen —</option>` +
+        jenisDokumenData.map(j => `<option value="${j}">${j}</option>`).join('');
+      _pasangCariJenisDokumen('dwJenisDokumenCari', 'dwJenisDokumen', 'dwJenisDokumenDropdown');
+      _segerakInputCariJenisDokumen('dwJenisDokumenCari', 'dwJenisDokumen');
+    };
+    if (jenisDokumenData.length > 0) {
+      _isiJenisDW();
+    } else {
+      google.script.run.withSuccessHandler(d => { jenisDokumenData = d||[]; _isiJenisDW(); }).dapatkanJenis();
+    }
+  }
+
+  google.script.run.withSuccessHandler(data => {
+    despatchWadData = data || [];
+    _renderDWDashboard();
+    _renderListDespatchWad();
+  }).dapatkanDespatchWad();
+}
+
+function _renderDWDashboard() {
+  const total  = despatchWadData.length;
+  const hariIni = despatchWadData.filter(d => _tarikhSahaja(d.tarikhHantar) === _fmtTarikh(new Date())).length;
+  const wadUnik = new Set(despatchWadData.map(d => d.wadTujuan)).size;
+  const sayaHantar = despatchWadData.filter(d => d.idPenghantar === currentUser.id).length;
+  const stats = [
+    { label:'Jumlah Despatch', value:total, icon:'fa-dolly', c:'bg-sky-50 text-sky-600 border-sky-100' },
+    { label:'Hari Ini', value:hariIni, icon:'fa-calendar-day', c:'bg-indigo-50 text-indigo-600 border-indigo-100' },
+    { label:'Wad/Unit Dilibatkan', value:wadUnik, icon:'fa-hospital', c:'bg-purple-50 text-purple-600 border-purple-100' },
+    { label:'Dihantar Oleh Saya', value:sayaHantar, icon:'fa-user-check', c:'bg-cyan-50 text-cyan-600 border-cyan-100' },
+  ];
+  const el = document.getElementById('dwDashStats');
+  if (!el) return;
+  setHTML(el, stats.map(s => {
+    const [bg, tc, bc] = s.c.split(' ');
+    return `<div class="bg-white rounded-2xl border ${bc} shadow-sm p-4 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl ${bg} ${bc} border flex items-center justify-center flex-shrink-0">
+        <i class="fas ${s.icon} ${tc} text-sm"></i>
+      </div>
+      <div><p class="text-xl font-extrabold text-slate-800">${s.value}</p><p class="text-[11px] text-slate-500">${s.label}</p></div>
+    </div>`;
+  }).join(''));
+}
+
+function _renderListDespatchWad() {
+  const container = document.getElementById('listDespatchWad');
+  if (!container) return;
+  const term = (document.getElementById('dwCariWad')?.value || '').trim().toLowerCase();
+  let list = [...despatchWadData];
+  if (term) list = list.filter(d => (d.wadTujuan||'').toLowerCase().includes(term) || (d.perihal||'').toLowerCase().includes(term));
+  list.sort((a,b) => new Date(b.tarikhHantar) - new Date(a.tarikhHantar));
+
+  if (list.length === 0) {
+    setHTML(container, `<div class="bg-white rounded-2xl border border-slate-200 shadow-sm">${_emptyState('fa-dolly','Tiada Despatch', term ? 'Tiada rekod sepadan dengan carian anda.' : 'Belum ada dokumen didespatch ke wad/unit.')}</div>`);
+    return;
+  }
+
+  setHTML(container, list.map(d => `
+    <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap mb-1.5">
+            <span class="text-[10px] font-bold bg-sky-100 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <i class="fas fa-hospital text-[9px]"></i>${d.wadTujuan}
+            </span>
+            ${d.jenisDokumen && d.jenisDokumen !== '-' ? `<span class="text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded-full">${d.jenisDokumen}</span>` : ''}
+          </div>
+          <p class="text-sm font-bold text-slate-800 whitespace-pre-wrap break-words">${d.perihal}</p>
+          ${d.catatan && d.catatan !== '-' ? `<p class="text-xs text-slate-500 mt-1 italic"><i class="fas fa-comment-dots mr-1"></i>${d.catatan}</p>` : ''}
+          <p class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-2 flex-wrap">
+            <span><i class="fas fa-user mr-1"></i>${d.namaPenghantar}</span>
+            <span><i class="far fa-calendar mr-1"></i>${d.tarikhHantar}</span>
+          </p>
+        </div>
+        <button onclick="cetakSlipDespatch('${d.id}')"
+          class="flex-shrink-0 px-3 py-1.5 bg-slate-100 hover:bg-sky-100 hover:text-sky-700 text-slate-600 font-bold rounded-lg text-xs transition-colors flex items-center gap-1.5">
+          <i class="fas fa-print"></i> Cetak Slip
+        </button>
+      </div>
+    </div>
+  `).join(''));
+}
+
+function hantarDespatchWad() {
+  const wadTujuan = document.getElementById('dwWadTujuan')?.value || '';
+  const perihal   = document.getElementById('dwPerihal')?.value.trim() || '';
+  const catatan   = document.getElementById('dwCatatan')?.value.trim() || '-';
+  let jenis       = document.getElementById('dwJenisDokumen')?.value || '';
+
+  if (!wadTujuan) return toast('error', 'Tidak Lengkap', 'Sila pilih wad/unit tujuan.');
+  if (!perihal)   return toast('error', 'Tidak Lengkap', 'Sila nyatakan perihal dokumen.');
+  if (jenis === 'Lain-lain Dokumen') {
+    const jenisLain = document.getElementById('dwJenisDokumenLain')?.value.trim() || '';
+    if (!jenisLain) return toast('error', 'Tidak Lengkap', 'Sila nyatakan jenis dokumen.');
+    jenis = jenisLain;
+  }
+
+  const now = _fmtTarikhMasa(new Date());
+  const data = {
+    id: 'DW' + Date.now().toString().slice(-8),
+    wadTujuan, jenisDokumen: jenis || '-', perihal, catatan,
+    namaPenghantar: currentUser.name, idPenghantar: currentUser.id,
+    tarikhHantar: now,
+  };
+
+  _optimistic(
+    () => {
+      despatchWadData.unshift(data);
+      logData.unshift({logId:'LOG'+Date.now(), idDokumen:data.id, namaDokumen:perihal, pengguna:currentUser.name, peranan:'penyemak', tindakan:'DESPATCH_WAD', catatan:`Didespatch ke ${wadTujuan}`, tarikhMasa:now});
+      _renderDWDashboard();
+      _renderListDespatchWad();
+    },
+    'hantarDespatchWad', [data],
+    `Dokumen berjaya didespatch ke ${wadTujuan}.`,
+    'Despatch Berjaya'
+  );
+
+  document.getElementById('dwWadTujuan').value = '';
+  document.getElementById('dwPerihal').value = '';
+  document.getElementById('dwCatatan').value = '';
+  document.getElementById('dwJenisDokumen').value = '';
+  document.getElementById('dwJenisDokumenCari').value = '';
+  _toggleJenisDokumenLainDW();
+}
+
+function cetakSlipDespatch(id) {
+  const d = despatchWadData.find(x => x.id === id);
+  if (!d) return toast('error', 'Ralat', 'Rekod despatch tidak dijumpai.');
+
+  const tarikhCetak = _fmtTarikhMasa(new Date());
+  const html = '<!DOCTYPE html><html lang="ms"><head><meta charset="UTF-8"><title>Slip Despatch - ' + d.id + '</title>' +
+'<style>' + _slipCSS() + '</style></head><body>' +
+  '<div class="page-wrap">' +
+    '<div class="slip-header">' +
+      '<div class="org">' +
+        '<b>Hospital Tengku Permaisuri Norashikin</b>' +
+        'Unit Kejururawatan \u2013 Sistem Pengurusan Dokumen (DDRS 2.0)' +
+      '</div>' +
+      '<div class="judul">' +
+        '<h2>Slip Despatch</h2>' +
+        '<div class="tkhcetak">Dicetak: ' + tarikhCetak + ' &nbsp;|&nbsp; Ruj: <b>' + d.id + '</b></div>' +
+      '</div>' +
+    '</div>' +
+    '<table class="dok">' +
+      '<thead><tr>' +
+        '<td class="no">Bil.</td>' +
+        '<td style="width:55%">Perihal Dokumen</td>' +
+        '<td>Wad/Unit Tujuan</td>' +
+        '<td>Tarikh</td>' +
+      '</tr></thead>' +
+      '<tbody>' +
+        '<tr>' +
+          '<td class="no">1</td>' +
+          '<td>' +
+            (d.jenisDokumen && d.jenisDokumen !== '-' ? '<div class="jenis">' + d.jenisDokumen + '</div>' : '') +
+            '<div class="nama">' + d.perihal + '</div>' +
+          '</td>' +
+          '<td class="sub"><b>' + d.wadTujuan + '</b></td>' +
+          '<td class="sub">' + d.tarikhHantar + '</td>' +
+        '</tr>' +
+      '</tbody>' +
+    '</table>' +
+    '<div class="ttd-section">' +
+      '<div class="ttd-title">Tandatangan Pengesahan</div>' +
+      '<div class="ttd-grid">' +
+        '<div class="ttd-box">' +
+          '<div class="tlbl">Dihantar Oleh</div>' +
+          '<div class="trole">Pegawai Unit Kejururawatan</div>' +
+          '<div class="tline">' +
+            '<div class="tnama">' + (d.namaPenghantar || '') + '</div>' +
+            '<div class="ttarikh">Tarikh: ' + _tarikhSahaja(d.tarikhHantar) + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ttd-box">' +
+          '<div class="tlbl">Diterima Oleh</div>' +
+          '<div class="trole">Pegawai ' + d.wadTujuan + '</div>' +
+          '<div class="tline">' +
+            '<div class="tnama">&nbsp;</div>' +
+            '<div class="ttarikh">Tarikh: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    (d.catatan && d.catatan !== '-' ? '<div style="margin-top:10px;padding:6px 10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px;font-size:8pt;color:#0c4a6e;"><b>CATATAN:</b> ' + d.catatan + '</div>' : '') +
+  '</div>' +
+  '<script>window.onload=function(){window.print();};<' + '/script></body></html>';
+
+  const win = window.open('', '_blank', 'width=860,height=700');
+  if (!win) return toast('error', 'Popup Disekat', 'Sila benarkan popup untuk mencetak slip.');
+  win.document.write(html);
+  win.document.close();
+}
+
+// ═══════════════════════════════════════════════
+// DESPATCH DITERIMA (Kakitangan)
+// ═══════════════════════════════════════════════
+function renderDespatchTerima() {
+  google.script.run.withSuccessHandler(data => {
+    despatchWadData = data || [];
+    _renderListDespatchTerima();
+  }).dapatkanDespatchWad();
+}
+
+function _renderListDespatchTerima() {
+  const container = document.getElementById('listDespatchTerima');
+  if (!container) return;
+  const term = (document.getElementById('dtCari')?.value || '').trim().toLowerCase();
+
+  const unitPenggunaMap = {};
+  (usersData || []).forEach(u => { unitPenggunaMap[u.id] = (u.unit || '').trim().toLowerCase(); });
+  const unitSaya = (unitPenggunaMap[currentUser.id] || (currentUser.unit || '').trim().toLowerCase());
+  if (unitSaya && !currentUser.unit) currentUser.unit = unitSaya;
+
+  let list = unitSaya
+    ? despatchWadData.filter(d => (d.wadTujuan || '').trim().toLowerCase() === unitSaya)
+    : [];
+  if (term) list = list.filter(d => (d.perihal||'').toLowerCase().includes(term));
+  list.sort((a,b) => new Date(b.tarikhHantar) - new Date(a.tarikhHantar));
+
+  if (!unitSaya) {
+    setHTML(container, _emptyState('fa-hospital', 'Unit Tidak Ditetapkan', 'Profil anda belum ada maklumat Unit/Wad. Hubungi Pentadbir Sistem.'));
+    return;
+  }
+  if (list.length === 0) {
+    setHTML(container, _emptyState('fa-inbox', 'Tiada Despatch', term ? 'Tiada rekod sepadan dengan carian anda.' : ('Tiada dokumen didespatch ke unit "' + currentUser.unit + '" setakat ini.')));
+    return;
+  }
+
+  setHTML(container, '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100">' +
+    list.map(d => `
+    <div class="flex items-start gap-3 px-5 py-3.5">
+      <div class="w-9 h-9 rounded-full bg-sky-50 border border-sky-100 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-dolly text-sky-500 text-xs"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
+          ${d.jenisDokumen && d.jenisDokumen !== '-' ? `<span class="text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded-full">${d.jenisDokumen}</span>` : ''}
+        </div>
+        <p class="text-sm font-bold text-slate-800 whitespace-pre-wrap break-words">${d.perihal}</p>
+        ${d.catatan && d.catatan !== '-' ? `<p class="text-xs text-slate-500 mt-1 italic"><i class="fas fa-comment-dots mr-1"></i>${d.catatan}</p>` : ''}
+        <p class="text-[11px] text-slate-400 mt-1"><i class="fas fa-user-tie mr-1"></i>${d.namaPenghantar} &bull; <i class="far fa-calendar mr-1"></i>${d.tarikhHantar}</p>
+      </div>
+    </div>`).join('') + '</div>');
 }
 
 function filterSD(f) {

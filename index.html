@@ -768,26 +768,32 @@
                     </label>
                     <div class="relative">
                       <i class="fas fa-tags absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
-                      <select name="jenisDokumen" id="selectJenisDokumen" required
+                      <select name="jenisDokumen" id="selectJenisDokumen" required onchange="_toggleJenisDokumenLainHantar()"
                         class="w-full pl-11 pr-10 border-2 border-slate-200 rounded-xl p-3.5 text-sm font-medium text-slate-700 bg-white focus:border-blue-500 focus:outline-none transition-colors appearance-none">
                         <option value="" disabled selected>— Pilih Jenis Dokumen —</option>
                       </select>
                       <i class="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
                     </div>
+                    <div id="hantarJenisLainWrap" class="hidden relative mt-2">
+                      <i class="fas fa-pen absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 text-sm pointer-events-none"></i>
+                      <input type="text" id="hantarJenisLain" placeholder="Nyatakan jenis dokumen..." oninput="_autoTitleCase(this)"
+                        class="w-full pl-11 pr-4 border-2 border-blue-200 rounded-xl p-3.5 text-sm font-medium focus:border-blue-500 focus:outline-none transition-colors">
+                    </div>
                   </div>
 
-                  <!-- Nama Dokumen -->
+                  <!-- Senarai Nama Penuh -->
                   <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Nama / Perihal Dokumen <span class="text-red-500">*</span>
-                    </label>
-                    <div class="relative">
-                      <i class="fas fa-file-alt absolute left-4 top-4 text-slate-400"></i>
-                      <textarea name="namaDokumen" required rows="4"
-                        placeholder="Cth: INVOIS PEMBELIAN NO. INV-2026-001&#10;- SALINAN IC&#10;- BORANG MAKLUMAT DIRI"
-                        oninput="_autoUpper(this)"
-                        class="w-full pl-11 border-2 border-slate-200 rounded-xl p-3.5 focus:border-blue-500 focus:outline-none transition-colors text-sm resize-none uppercase"></textarea>
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        Nama Penuh <span class="text-red-500">*</span>
+                      </label>
+                      <button type="button" onclick="tambahBarisNama()"
+                        class="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                        <i class="fas fa-plus-circle"></i> Tambah Nama
+                      </button>
                     </div>
+                    <div id="hantarNamaSenarai" class="space-y-2"></div>
+                    <p class="text-[11px] text-slate-400 mt-1.5">Tambah lebih daripada satu nama jika dokumen ini melibatkan beberapa kakitangan (cth: borang kelompok).</p>
                   </div>
 
                   <!-- Catatan Tambahan -->
@@ -1521,10 +1527,23 @@
         <p id="semakDocSemulaOleh" class="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1.5 mt-1.5 hidden"></p>
         <p id="semakDocNote" class="text-xs text-slate-400 mt-1.5 italic bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5 hidden"></p>
       </div>
+
+      <!-- Checklist nama (hanya untuk dokumen berkelompok >1 nama) -->
+      <div id="semakNamaChecklistWrap" class="hidden mb-5">
+        <label class="block text-xs font-bold text-slate-600 mb-2">
+          Senarai Nama <span class="text-slate-400 font-normal">(tandakan nama yang bermasalah SAHAJA jika sebahagian ada isu)</span>
+        </label>
+        <div id="semakNamaChecklist" class="space-y-1.5 max-h-40 overflow-y-auto border-2 border-slate-200 rounded-xl p-2.5"></div>
+      </div>
+
       <input type="hidden" id="semakDocId">
       <input type="hidden" id="semakCatatan" value="">
       <!-- Action buttons -->
       <div class="flex gap-3">
+        <button id="btnSemakQuerySebahagian" onclick="bukaModalQuerySebahagian('penyemak')"
+          class="hidden flex-1 py-3 bg-orange-100 hover:bg-orange-200 border-2 border-orange-400 text-orange-800 font-bold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
+          <i class="fas fa-flag"></i> Query Nama Ditanda
+        </button>
         <button onclick="openModalQuery('penyemak')" class="flex-1 py-3 bg-orange-50 hover:bg-orange-100 border-2 border-orange-300 text-orange-700 font-bold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
           <i class="fas fa-exclamation-circle"></i> Query / Kembalikan
         </button>
@@ -1671,6 +1690,12 @@
       <input type="hidden" id="queryDocId">
       <input type="hidden" id="queryJenis"> <!-- 'penyemak' atau 'usm' -->
 
+      <!-- Nama terlibat (hanya papar bila query sebahagian) -->
+      <div id="querySebahagianWrap" class="hidden bg-orange-100 border-2 border-orange-300 rounded-xl p-3 mb-5">
+        <p class="text-[11px] font-bold text-orange-700 uppercase tracking-wider mb-1"><i class="fas fa-flag mr-1"></i>Nama Yang Di-Query</p>
+        <p id="querySebahagianNamaText" class="text-sm font-semibold text-orange-800"></p>
+      </div>
+
       <!-- Sebab query (WAJIB) -->
       <div class="mb-5">
         <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
@@ -1779,38 +1804,6 @@
         </h4>
 
         <div>
-          <label class="block text-xs font-bold text-slate-600 mb-2">Status Kelengkapan Dokumen <span class="text-red-500">*</span></label>
-          <div class="grid grid-cols-2 gap-2">
-            <label class="flex items-center gap-2 p-3 border-2 border-slate-200 rounded-xl cursor-pointer hover:border-indigo-400 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
-              <input type="radio" name="kelengkapan" value="Lengkap" class="text-indigo-600 w-4 h-4">
-              <span class="text-sm font-semibold text-slate-700">✅ Lengkap</span>
-            </label>
-            <label class="flex items-center gap-2 p-3 border-2 border-slate-200 rounded-xl cursor-pointer hover:border-amber-400 transition-colors has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
-              <input type="radio" name="kelengkapan" value="Tidak Lengkap" class="text-amber-600 w-4 h-4">
-              <span class="text-sm font-semibold text-slate-700">⚠️ Tidak Lengkap</span>
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-600 mb-2">Keadaan Dokumen <span class="text-red-500">*</span></label>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <label class="flex items-center gap-2 p-3 border-2 border-slate-200 rounded-xl cursor-pointer hover:border-green-400 transition-colors has-[:checked]:border-green-500 has-[:checked]:bg-green-50">
-              <input type="radio" name="keadaan" value="Baik" class="text-green-600 w-4 h-4">
-              <span class="text-xs font-semibold text-slate-700">Baik</span>
-            </label>
-            <label class="flex items-center gap-2 p-3 border-2 border-slate-200 rounded-xl cursor-pointer hover:border-amber-400 transition-colors has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
-              <input type="radio" name="keadaan" value="Rosak" class="text-amber-600 w-4 h-4">
-              <span class="text-xs font-semibold text-slate-700">Rosak</span>
-            </label>
-            <label class="flex items-center gap-2 p-3 border-2 border-slate-200 rounded-xl cursor-pointer hover:border-blue-400 transition-colors has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-              <input type="radio" name="keadaan" value="Fotokopi" class="text-blue-600 w-4 h-4">
-              <span class="text-xs font-semibold text-slate-700">Fotokopi</span>
-            </label>
-          </div>
-        </div>
-
-        <div>
           <label class="block text-xs font-bold text-slate-600 mb-2">Catatan Semakan Terperinci <span class="text-slate-400 font-normal">(pilihan)</span></label>
           <textarea id="semakanCatatan" rows="3" placeholder="Cth: Dokumen asal diterima, semua lampiran hadir, cop rasmi ada, tandatangan lengkap..."
             class="w-full border-2 border-slate-200 rounded-xl p-3 focus:border-indigo-500 focus:outline-none transition-colors text-sm resize-none"></textarea>
@@ -1878,12 +1871,25 @@
         <div id="usmTimeline" class="space-y-2"></div>
       </div>
       <input type="hidden" id="usmDocId">
+
+      <!-- Checklist nama (hanya untuk dokumen berkelompok >1 nama) -->
+      <div id="usmNamaChecklistWrap" class="hidden mb-5">
+        <label class="block text-xs font-bold text-slate-600 mb-2">
+          Senarai Nama <span class="text-slate-400 font-normal">(tandakan nama yang bermasalah SAHAJA jika sebahagian ada isu)</span>
+        </label>
+        <div id="usmNamaChecklist" class="space-y-1.5 max-h-40 overflow-y-auto border-2 border-slate-200 rounded-xl p-2.5"></div>
+      </div>
+
       <div class="mb-5">
         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan Pengesahan (Pilihan)</label>
         <textarea id="usmCatatan" rows="2" placeholder="Cth: Dokumen lengkap dan diterima"
           class="w-full border-2 border-slate-200 rounded-xl p-3 focus:border-emerald-500 focus:outline-none transition-colors text-sm resize-none"></textarea>
       </div>
       <div class="flex gap-3">
+        <button id="btnUsmQuerySebahagian" onclick="bukaModalQuerySebahagian('usm')"
+          class="hidden flex-1 py-3 bg-orange-100 hover:bg-orange-200 border-2 border-orange-400 text-orange-800 font-bold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
+          <i class="fas fa-flag"></i> Query Nama Ditanda
+        </button>
         <button onclick="openModalQuery('usm')" class="flex-1 py-3 bg-orange-50 hover:bg-orange-100 border-2 border-orange-300 text-orange-700 font-bold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
           <i class="fas fa-exclamation-circle"></i> Query / Kembalikan
         </button>
@@ -3059,6 +3065,10 @@ function renderFormHantar() {
   const sel = document.getElementById('selectJenisDokumen');
   if (!sel) return;
 
+  // Pastikan senarai nama ada sekurang-kurangnya satu baris kosong
+  const namaContainer = document.getElementById('hantarNamaSenarai');
+  if (namaContainer && namaContainer.children.length === 0) tambahBarisNama();
+
   const _populateJenis = () => {
     const current = sel.value;
     setHTML(sel, `<option value="" disabled selected>— Pilih Jenis Dokumen —</option>` +
@@ -3105,22 +3115,124 @@ function renderFormHantar() {
     </div>`).join(''));
 }
 
+function _toggleJenisDokumenLainHantar() {
+  const sel  = document.getElementById('selectJenisDokumen');
+  const wrap = document.getElementById('hantarJenisLainWrap');
+  const inp  = document.getElementById('hantarJenisLain');
+  if (!sel || !wrap || !inp) return;
+  if (sel.value === 'Lain-lain Dokumen') {
+    wrap.classList.remove('hidden');
+  } else {
+    wrap.classList.add('hidden');
+    inp.value = '';
+  }
+}
+
+// ─────────────────────────────────────────────
+// SENARAI NAMA DINAMIK (Borang Serahan)
+// ─────────────────────────────────────────────
+let _hantarNamaBarisId = 0;
+
+function _barisNamaHTML(idBaris, nilai) {
+  return `
+  <div class="flex items-center gap-2" data-baris-nama="${idBaris}">
+    <div class="relative flex-1">
+      <i class="fas fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+      <input type="text" value="${nilai || ''}" placeholder="NAMA PENUH..." oninput="_autoUpper(this)"
+        class="hantar-nama-input w-full pl-9 pr-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium uppercase focus:border-blue-500 focus:outline-none transition-colors">
+    </div>
+    <button type="button" onclick="buangBarisNama(${idBaris})"
+      class="hantar-nama-buang flex-shrink-0 w-9 h-9 rounded-xl bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors">
+      <i class="fas fa-times text-sm"></i>
+    </button>
+  </div>`;
+}
+
+function tambahBarisNama(nilai) {
+  const container = document.getElementById('hantarNamaSenarai');
+  if (!container) return;
+  _hantarNamaBarisId++;
+  container.insertAdjacentHTML('beforeend', _barisNamaHTML(_hantarNamaBarisId, nilai));
+  _kemaskiniButangBuangNama();
+}
+
+function buangBarisNama(idBaris) {
+  const container = document.getElementById('hantarNamaSenarai');
+  const baris = container?.querySelector(`[data-baris-nama="${idBaris}"]`);
+  if (baris) baris.remove();
+  if (container && container.children.length === 0) tambahBarisNama();
+  _kemaskiniButangBuangNama();
+}
+
+function _kemaskiniButangBuangNama() {
+  const container = document.getElementById('hantarNamaSenarai');
+  if (!container) return;
+  const bilangan = container.children.length;
+  container.querySelectorAll('.hantar-nama-buang').forEach(btn => {
+    btn.classList.toggle('hidden', bilangan <= 1);
+  });
+}
+
+function _dapatkanSenaraiNamaHantar() {
+  return [...document.querySelectorAll('#hantarNamaSenarai .hantar-nama-input')]
+    .map(el => el.value.trim().toUpperCase())
+    .filter(v => v);
+}
+
+function _formatSenaraiNama(arr) {
+  if (!arr || arr.length === 0) return '-';
+  if (arr.length === 1) return arr[0];
+  return arr.map((n, i) => `${i + 1}. ${n}`).join('\n');
+}
+
+// Lencana bilangan nama — dipaparkan pada kad dokumen bila dokumen melibatkan >1 nama
+function _lencanaBilanganNama(d) {
+  const bil = (d.namaSenarai && d.namaSenarai.length) ? d.namaSenarai.length : 0;
+  if (bil <= 1) return '';
+  return `<span class="text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1"><i class="fas fa-users text-[9px]"></i>${bil} Nama</span>`;
+}
+
+// Lencana rujukan — dipaparkan bila dokumen ini hasil pisahan (indukId) atau induk kepada pisahan
+function _lencanaPautanDokumen(d) {
+  if (d.indukId && d.indukId !== '-') {
+    return `<span class="text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full flex items-center gap-1" title="Dipisahkan daripada dokumen ${d.indukId}"><i class="fas fa-code-branch text-[9px]"></i>Dari ${d.indukId}</span>`;
+  }
+  const adaAnak = db.some(x => x.indukId === d.id);
+  if (adaAnak) {
+    return `<span class="text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full flex items-center gap-1" title="Sebahagian nama dipisahkan sebagai query"><i class="fas fa-code-branch text-[9px]"></i>Ada Pisahan</span>`;
+  }
+  return '';
+}
+
 function resetFormHantar() {
   document.getElementById('formHantar').reset();
   document.getElementById('inputPenghantar').value = currentUser.name;
   // Reset dropdown jenis (ke pilih)
   const sel = document.getElementById('selectJenisDokumen');
   if (sel) sel.value = '';
+  _toggleJenisDokumenLainHantar();
+  // Reset senarai nama — kekalkan satu baris kosong sahaja
+  const container = document.getElementById('hantarNamaSenarai');
+  if (container) { container.innerHTML = ''; tambahBarisNama(); }
 }
 
 function handleHantar(e) {
   e.preventDefault();
-  const jenis = e.target.jenisDokumen.value.trim();
+  let jenis = e.target.jenisDokumen.value.trim();
   if (!jenis) return toast('error', 'Tidak Lengkap', 'Sila pilih jenis dokumen.');
+  if (jenis === 'Lain-lain Dokumen') {
+    const jenisLain = document.getElementById('hantarJenisLain')?.value.trim() || '';
+    if (!jenisLain) return toast('error', 'Tidak Lengkap', 'Sila nyatakan jenis dokumen.');
+    jenis = jenisLain;
+  }
+  const namaSenarai = _dapatkanSenaraiNamaHantar();
+  if (namaSenarai.length === 0) return toast('error', 'Tidak Lengkap', 'Sila isi sekurang-kurangnya satu nama penuh.');
   const d = {
     id: 'DOC' + Date.now().toString().slice(-7),
     jenisDokumen:    jenis,
-    namaDokumen:     e.target.namaDokumen.value.trim(),
+    namaDokumen:     _formatSenaraiNama(namaSenarai),
+    namaSenarai:     namaSenarai,
+    indukId:         '-',
     namaPenghantar:  currentUser.name,
     idPenghantar:    currentUser.id,
     unitPenghantar:  currentUser.unit || '-',
@@ -3334,6 +3446,8 @@ function renderStatus() {
                 ? `<span class="text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded-full">${d.jenisDokumen}</span>`
                 : ''}
               ${hasQuery ? `<span class="text-[10px] font-bold bg-orange-100 text-orange-700 border border-orange-200 px-1.5 py-0.5 rounded-full flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-orange-500 pulse-dot"></span>Perlu Tindakan</span>` : ''}
+              ${_lencanaBilanganNama(d)}
+              ${_lencanaPautanDokumen(d)}
             </div>
             <p class="text-sm font-bold text-slate-800 whitespace-pre-wrap break-words leading-snug mt-0.5">${d.namaDokumen}</p>
             ${showPenghantar ? `<p class="text-[11px] text-slate-400 mt-0.5"><i class="fas fa-user-tie mr-1 text-slate-300"></i>${d.namaPenghantar}</p>` : ''}
@@ -3471,7 +3585,14 @@ function bukaDetailStatus(docId) {
 
   // ── Render dalam modal ──
   const modal = document.getElementById('modalDetailStatus');
+  const anakDokumen = db.filter(x => x.indukId === d.id);
+  const alertPautan = d.indukId && d.indukId !== '-'
+    ? `<div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 text-xs text-slate-600 flex items-center gap-2"><i class="fas fa-code-branch text-slate-400"></i>Dokumen ini dipisahkan daripada <b class="mono">${d.indukId}</b> (sebahagian nama dalam kumpulan asal).</div>`
+    : anakDokumen.length > 0
+    ? `<div class="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4 text-xs text-orange-700"><i class="fas fa-code-branch mr-1.5"></i>Sebahagian nama dalam dokumen ini telah dipisahkan sebagai query berasingan: ${anakDokumen.map(a => `<b class="mono">${a.id}</b> (${statusPill(a.status)})`).join(', ')}</div>`
+    : '';
   setHTML(document.getElementById('detailStatusBody'), `
+    ${alertPautan}
     <!-- Info dokumen -->
     <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
       <div class="flex items-start justify-between gap-3">
@@ -3531,6 +3652,8 @@ function renderInbox() {
             <span class="text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full flex items-center gap-1">
               <span class="w-1.5 h-1.5 bg-purple-500 rounded-full pulse-dot"></span> BARU
             </span>
+            ${_lencanaBilanganNama(d)}
+            ${_lencanaPautanDokumen(d)}
           </div>
           <p class="font-bold text-slate-800 whitespace-pre-wrap break-words">${d.namaDokumen}</p>
           <div class="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
@@ -3561,6 +3684,25 @@ function openModalPenyemak(docId) {
   document.getElementById('semakDocId').value = docId;
   document.getElementById('semakDocName').textContent = d.namaDokumen;
   setHTML(document.getElementById('semakDocFrom'), `<i class="fas fa-user-tie mr-1"></i><b>${d.namaPenghantar}</b> &bull; ${_tarikhSahaja(d.tarikhSerahan)}`);
+
+  // Checklist nama — hanya papar jika dokumen berkelompok (>1 nama)
+  const checklistWrap = document.getElementById('semakNamaChecklistWrap');
+  const checklistBody = document.getElementById('semakNamaChecklist');
+  const btnSebahagian = document.getElementById('btnSemakQuerySebahagian');
+  const namaSenaraiChk = (d.namaSenarai && d.namaSenarai.length) ? d.namaSenarai : [];
+  if (namaSenaraiChk.length > 1) {
+    setHTML(checklistBody, namaSenaraiChk.map((nama, i) => `
+      <label class="flex items-center gap-2.5 p-2 rounded-lg hover:bg-orange-50 cursor-pointer transition-colors">
+        <input type="checkbox" value="${nama.replace(/"/g,'&quot;')}" class="semak-nama-tick w-4 h-4 accent-orange-500 rounded flex-shrink-0">
+        <span class="text-sm font-medium text-slate-700">${i + 1}. ${nama}</span>
+      </label>
+    `).join(''));
+    checklistWrap.classList.remove('hidden');
+    btnSebahagian.classList.remove('hidden');
+  } else {
+    checklistWrap.classList.add('hidden');
+    btnSebahagian.classList.add('hidden');
+  }
 
   // Jika dokumen ini pernah dihantar semula selepas Query, papar SIAPA yang
   // buat tindakan Hantar Semula (mungkin berbeza daripada penghantar asal —
@@ -3609,7 +3751,19 @@ function submitPenyemak(tindakan) {
 // ─────────────────────────────────────────────
 // MODAL QUERY + HANTAR SEMULA
 // ─────────────────────────────────────────────
+function bukaModalQuerySebahagian(jenis) {
+  const wrapId = jenis === 'usm' ? 'usmNamaChecklist' : 'semakNamaChecklist';
+  const checked = [...document.querySelectorAll(`#${wrapId} .semak-nama-tick:checked`)].map(cb => cb.value);
+  if (checked.length === 0) return toast('error', 'Tidak Lengkap', 'Sila tandakan sekurang-kurangnya satu nama bermasalah.');
+  openModalQuery(jenis);
+  window._querySebahagianNama = checked;
+  document.getElementById('querySebahagianNamaText').textContent = checked.join(', ');
+  document.getElementById('querySebahagianWrap').classList.remove('hidden');
+}
+
 function openModalQuery(jenis) {
+  window._querySebahagianNama = null;
+  document.getElementById('querySebahagianWrap').classList.add('hidden');
   // jenis = 'penyemak' atau 'usm'
   const docIdSrc = jenis === 'usm'
     ? document.getElementById('usmDocId').value
@@ -3643,27 +3797,94 @@ function submitQuery() {
 
   if (!alasan) return toast('error', 'Diperlukan', 'Sila nyatakan sebab / tindakan yang diperlukan.');
 
-  const now = _fmtTarikhMasa(new Date());
-  const statusBaru = jenis === 'usm' ? 'Query USM' : 'Query';
-  const catatanLog = `Sebab: ${alasan}${arahan ? ' | Arahan: ' + arahan : ''}`;
+  const d = db.find(x => x.id === docId);
+  const namaTerlibat = window._querySebahagianNama;
+  const semuaNama = (d?.namaSenarai && d.namaSenarai.length) ? d.namaSenarai : [d?.namaDokumen];
+  const isPartial = Array.isArray(namaTerlibat) && namaTerlibat.length > 0 && namaTerlibat.length < semuaNama.length;
 
-  _optimistic(
-    () => {
-      const d = db.find(x => x.id === docId);
-      if (d) {
-        d.status = statusBaru;
-        if (jenis==='usm') { d.namaUSM=currentUser.name; d.catatanUSM=catatanLog; d.tarikhUSM=now; }
-        else { d.namaPenyemak=currentUser.name; d.catatanPenyemak=catatanLog; d.tarikhSemak=now; }
-      }
-      logData.unshift({logId:'LOG'+Date.now(), idDokumen:docId, namaDokumen:d?.namaDokumen||'', pengguna:currentUser.name, peranan:jenis==='usm'?'usm':'penyemak', tindakan:jenis==='usm'?'USM_QUERY':'PENYEMAK_QUERY', catatan:catatanLog, tarikhMasa:now});
-    },
-    'tolakQuery', [docId, jenis, currentUser.name, alasan, arahan],
-    'Penghantar akan melihat sebab dan boleh hantar semula.',
-    'Dokumen Dikembalikan sebagai Query'
-  );
+  if (isPartial) {
+    _submitQuerySebahagian(docId, namaTerlibat, alasan, arahan, jenis);
+  } else {
+    // ═══ ALIRAN SEDIA ADA (query keseluruhan dokumen) — TIDAK DIUBAH ═══
+    const now = _fmtTarikhMasa(new Date());
+    const statusBaru = jenis === 'usm' ? 'Query USM' : 'Query';
+    const catatanLog = `Sebab: ${alasan}${arahan ? ' | Arahan: ' + arahan : ''}`;
+
+    _optimistic(
+      () => {
+        const dd = db.find(x => x.id === docId);
+        if (dd) {
+          dd.status = statusBaru;
+          if (jenis==='usm') { dd.namaUSM=currentUser.name; dd.catatanUSM=catatanLog; dd.tarikhUSM=now; }
+          else { dd.namaPenyemak=currentUser.name; dd.catatanPenyemak=catatanLog; dd.tarikhSemak=now; }
+        }
+        logData.unshift({logId:'LOG'+Date.now(), idDokumen:docId, namaDokumen:dd?.namaDokumen||'', pengguna:currentUser.name, peranan:jenis==='usm'?'usm':'penyemak', tindakan:jenis==='usm'?'USM_QUERY':'PENYEMAK_QUERY', catatan:catatanLog, tarikhMasa:now});
+      },
+      'tolakQuery', [docId, jenis, currentUser.name, alasan, arahan],
+      'Penghantar akan melihat sebab dan boleh hantar semula.',
+      'Dokumen Dikembalikan sebagai Query'
+    );
+  }
+
+  window._querySebahagianNama = null;
   closeModal('modalQuery');
   if (jenis === 'usm') closeModal('modalUSM');
   else closeModal('modalPenyemak');
+}
+
+// Pisahkan dokumen: nama TERLIBAT -> dokumen Query baharu (dipautkan via indukId).
+// Nama BAKI (tidak terlibat) -> KEKAL pada dokumen asal, terus diproses (Disemak/Selesai)
+// tanpa perlu tunggu nama yang di-query itu diselesaikan dahulu.
+function _submitQuerySebahagian(docId, namaTerlibat, alasan, arahan, jenis) {
+  const dAsal = db.find(x => x.id === docId);
+  if (!dAsal) return;
+
+  const now         = _fmtTarikhMasa(new Date());
+  const catatanLog  = `Sebab: ${alasan}${arahan ? ' | Arahan: ' + arahan : ''}`;
+  const namaSemua   = (dAsal.namaSenarai && dAsal.namaSenarai.length) ? dAsal.namaSenarai : [dAsal.namaDokumen];
+  const namaBaki    = namaSemua.filter(n => !namaTerlibat.includes(n));
+  const idBaharu    = 'DOC' + Date.now().toString().slice(-7) + 'Q';
+
+  const dokBaharu = {
+    id: idBaharu,
+    jenisDokumen:    dAsal.jenisDokumen,
+    namaDokumen:     _formatSenaraiNama(namaTerlibat),
+    namaSenarai:     namaTerlibat,
+    indukId:         docId,
+    namaPenghantar:  dAsal.namaPenghantar,
+    idPenghantar:    dAsal.idPenghantar,
+    unitPenghantar:  dAsal.unitPenghantar,
+    tarikhSerahan:   dAsal.tarikhSerahan,
+    catatan:         dAsal.catatan,
+    status:          jenis === 'usm' ? 'Query USM' : 'Query',
+    namaPenyemak:    jenis === 'usm' ? dAsal.namaPenyemak : currentUser.name,
+    tarikhSemak:     jenis === 'usm' ? dAsal.tarikhSemak  : now,
+    catatanPenyemak: jenis === 'usm' ? dAsal.catatanPenyemak : catatanLog,
+    idPenerimaUSM:   dAsal.idPenerimaUSM,
+    namaPenerimaUSM: dAsal.namaPenerimaUSM,
+    namaUSM:         jenis === 'usm' ? currentUser.name : '-',
+    tarikhUSM:       jenis === 'usm' ? now : '-',
+    catatanUSM:      jenis === 'usm' ? catatanLog : '-',
+    tindakanPenyemak:'-', tindakanUSM:'-',
+  };
+
+  _optimistic(
+    () => {
+      db.unshift(dokBaharu);
+      const d = db.find(x => x.id === docId);
+      if (d) {
+        d.namaSenarai = namaBaki;
+        d.namaDokumen = _formatSenaraiNama(namaBaki);
+        if (jenis === 'usm') { d.status = 'Selesai'; d.namaUSM = currentUser.name; d.tarikhUSM = now; }
+        else                 { d.status = 'Disemak'; d.namaPenyemak = currentUser.name; d.tarikhSemak = now; }
+      }
+      logData.unshift({logId:'LOG'+Date.now(), idDokumen:idBaharu, namaDokumen:dokBaharu.namaDokumen, pengguna:currentUser.name, peranan: jenis==='usm'?'usm':'penyemak', tindakan: jenis==='usm'?'USM_QUERY':'PENYEMAK_QUERY', catatan:`${catatanLog} (dipisahkan daripada ${docId})`, tarikhMasa:now});
+      logData.unshift({logId:'LOG'+(Date.now()+1), idDokumen:docId, namaDokumen:d?.namaDokumen||'', pengguna:currentUser.name, peranan: jenis==='usm'?'usm':'penyemak', tindakan: jenis==='usm'?'USM_TERIMA':'PENYEMAK_TERIMA', catatan:`Baki ${namaBaki.length} nama diterima — ${namaTerlibat.length} nama dipisahkan sebagai query`, tarikhMasa:now});
+    },
+    'pisahkanDokumenQuery', [docId, namaTerlibat, alasan, arahan, jenis, currentUser.name, dAsal.idPenerimaUSM || '', dAsal.namaPenerimaUSM || ''],
+    `${namaTerlibat.length} nama dikembalikan sebagai query. Baki ${namaBaki.length} nama terus diproses.`,
+    'Dipisahkan & Diproses'
+  );
 }
 
 async function hantarSemula(docId) {
@@ -3737,6 +3958,8 @@ function renderSemakan() {
           <div class="flex flex-wrap items-center gap-2 mb-2">
             <span class="mono text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">${d.id}</span>
             ${statusPill(d.status)}
+            ${_lencanaBilanganNama(d)}
+            ${_lencanaPautanDokumen(d)}
           </div>
           <p class="font-bold text-slate-800 text-base whitespace-pre-wrap break-words mb-3">${d.namaDokumen}</p>
 
@@ -3802,8 +4025,6 @@ function openModalSemakan(docId) {
     usmUsers.map(u => `<option value="${u.id}" data-nama="${u.name}">${u.name}</option>`).join(''));
 
   // Reset form
-  document.querySelectorAll('input[name="kelengkapan"]').forEach(r => r.checked = false);
-  document.querySelectorAll('input[name="keadaan"]').forEach(r => r.checked = false);
   document.getElementById('semakanCatatan').value = '';
   document.getElementById('semakanSyorUSM').value = '';
   selectUSM.value = '';
@@ -3813,8 +4034,6 @@ function openModalSemakan(docId) {
 
 function submitSemakanHantarUSM() {
   const docId        = document.getElementById('semakanDocId').value;
-  const kelengkapan  = document.querySelector('input[name="kelengkapan"]:checked')?.value || '';
-  const keadaan      = document.querySelector('input[name="keadaan"]:checked')?.value || '';
   const catatanSemak = document.getElementById('semakanCatatan').value.trim();
   const syorUSM      = document.getElementById('semakanSyorUSM').value.trim();
   const selectEl     = document.getElementById('semakanPilihUSM');
@@ -3822,14 +4041,10 @@ function submitSemakanHantarUSM() {
   const namaPenerima = selectEl.options[selectEl.selectedIndex]?.getAttribute('data-nama') || '';
 
   // Validasi
-  if (!kelengkapan)  return toast('error', 'Tidak Lengkap', 'Sila pilih status kelengkapan dokumen.');
-  if (!keadaan)      return toast('error', 'Tidak Lengkap', 'Sila pilih keadaan dokumen.');
   if (!idPenerima)   return toast('error', 'Tidak Lengkap', 'Sila pilih pegawai USM penerima.');
 
   // Gabungkan semua dapatan — catatan semakan adalah pilihan
   const catatanGabung = [
-    `[Kelengkapan: ${kelengkapan}]`,
-    `[Keadaan: ${keadaan}]`,
     catatanSemak || '',
     syorUSM ? `Syorkan: ${syorUSM}` : ''
   ].filter(Boolean).join(' ').trim();
@@ -3910,6 +4125,25 @@ function openModalUSM(docId) {
   if (!d) return;
   document.getElementById('usmDocId').value = docId;
   document.getElementById('usmCatatan').value = '';
+
+  // Checklist nama — hanya papar jika dokumen berkelompok (>1 nama)
+  const checklistWrap = document.getElementById('usmNamaChecklistWrap');
+  const checklistBody = document.getElementById('usmNamaChecklist');
+  const btnSebahagian = document.getElementById('btnUsmQuerySebahagian');
+  const namaSenaraiChk = (d.namaSenarai && d.namaSenarai.length) ? d.namaSenarai : [];
+  if (namaSenaraiChk.length > 1) {
+    setHTML(checklistBody, namaSenaraiChk.map((nama, i) => `
+      <label class="flex items-center gap-2.5 p-2 rounded-lg hover:bg-orange-50 cursor-pointer transition-colors">
+        <input type="checkbox" value="${nama.replace(/"/g,'&quot;')}" class="semak-nama-tick w-4 h-4 accent-orange-500 rounded flex-shrink-0">
+        <span class="text-sm font-medium text-slate-700">${i + 1}. ${nama}</span>
+      </label>
+    `).join(''));
+    checklistWrap.classList.remove('hidden');
+    btnSebahagian.classList.remove('hidden');
+  } else {
+    checklistWrap.classList.add('hidden');
+    btnSebahagian.classList.add('hidden');
+  }
 
   // Build timeline dengan info penerima USM
   const tl = [
@@ -4066,6 +4300,8 @@ function renderRekod() {
           ${d.jenisDokumen && d.jenisDokumen !== '-'
             ? `<span class="text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded-full">${d.jenisDokumen}</span>`
             : ''}
+          ${_lencanaBilanganNama(d)}
+          ${_lencanaPautanDokumen(d)}
         </div>
         <p class="text-sm font-bold text-slate-800 whitespace-pre-wrap break-words leading-snug">${d.namaDokumen}</p>
         <!-- Sub-info compact -->
@@ -4158,7 +4394,15 @@ function bukaDetailRekod(docId) {
         </div>`;
       }).join('');
 
+  const anakDokumenRekod = db.filter(x => x.indukId === d.id);
+  const alertPautanRekod = d.indukId && d.indukId !== '-'
+    ? `<div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 text-xs text-slate-600 flex items-center gap-2"><i class="fas fa-code-branch text-slate-400"></i>Dipisahkan daripada <b class="mono">${d.indukId}</b> (sebahagian nama dalam kumpulan asal).</div>`
+    : anakDokumenRekod.length > 0
+    ? `<div class="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4 text-xs text-orange-700"><i class="fas fa-code-branch mr-1.5"></i>Sebahagian nama telah dipisahkan sebagai query: ${anakDokumenRekod.map(a => `<b class="mono">${a.id}</b> (${statusPill(a.status)})`).join(', ')}</div>`
+    : '';
+
   setHTML(document.getElementById('detailStatusBody'), `
+    ${alertPautanRekod}
     <!-- Header info -->
     <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
       <div class="flex items-start justify-between gap-3 mb-3">

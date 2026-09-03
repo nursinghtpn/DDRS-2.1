@@ -5851,14 +5851,29 @@ function filterSD(f) {
 }
 
 function _parseTarikhDDMMYYYY(tarikhStr) {
-  // Terima "dd/mm/yyyy" atau "dd/mm/yyyy, HH:MM:SS PG/PTG" → "yyyy-mm-dd" (untuk perbandingan)
+  // Terima "dd/mm/yyyy" ATAU "dd MMM yyyy" (nama bulan Melayu, cth: "03 Sep 2026")
+  // — kedua-duanya boleh diikuti ", HH:MM:SS PG/PTG" — pulangkan "yyyy-mm-dd" untuk perbandingan
   if (!tarikhStr) return '';
   const bahagianTarikh = String(tarikhStr).split(',')[0].trim();
-  const parts = bahagianTarikh.split('/');
-  if (parts.length !== 3) return '';
-  const [dd, mm, yyyy] = parts;
-  if (!dd || !mm || !yyyy) return '';
-  return `${yyyy.padStart(4,'0')}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+
+  // Cuba format nombor "dd/mm/yyyy" dahulu
+  const partsSlash = bahagianTarikh.split('/');
+  if (partsSlash.length === 3) {
+    const [dd, mm, yyyy] = partsSlash;
+    if (dd && mm && yyyy) return `${yyyy.padStart(4,'0')}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+  }
+
+  // Fallback: format "dd MMM yyyy" dengan nama bulan Melayu (data lama)
+  const NAMA_BULAN = { jan:'01', feb:'02', mac:'03', apr:'04', mei:'05', jun:'06',
+                        jul:'07', ogo:'08', ogos:'08', sep:'09', okt:'10', nov:'11', dis:'12' };
+  const match = bahagianTarikh.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
+  if (match) {
+    const [, dd, namaBulan, yyyy] = match;
+    const mm = NAMA_BULAN[namaBulan.toLowerCase()];
+    if (mm) return `${yyyy}-${mm}-${dd.padStart(2,'0')}`;
+  }
+
+  return '';
 }
 
 function _resetFilterLanjutanSD() {

@@ -1518,6 +1518,7 @@
         <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Maklumat Dokumen</p>
         <p id="semakDocName" class="font-bold text-slate-800 text-base whitespace-pre-wrap break-words"></p>
         <p id="semakDocFrom" class="text-sm text-slate-500 mt-1"></p>
+        <p id="semakDocSemulaOleh" class="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1.5 mt-1.5 hidden"></p>
         <p id="semakDocNote" class="text-xs text-slate-400 mt-1.5 italic bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5 hidden"></p>
       </div>
       <input type="hidden" id="semakDocId">
@@ -3555,6 +3556,23 @@ function openModalPenyemak(docId) {
   document.getElementById('semakDocId').value = docId;
   document.getElementById('semakDocName').textContent = d.namaDokumen;
   setHTML(document.getElementById('semakDocFrom'), `<i class="fas fa-user-tie mr-1"></i><b>${d.namaPenghantar}</b> &bull; ${_tarikhSahaja(d.tarikhSerahan)}`);
+
+  // Jika dokumen ini pernah dihantar semula selepas Query, papar SIAPA yang
+  // buat tindakan Hantar Semula (mungkin berbeza daripada penghantar asal —
+  // kakitangan lain dalam unit yang sama boleh proses query rakan sewad)
+  const semulaEl = document.getElementById('semakDocSemulaOleh');
+  const logSemula = logData
+    .filter(l => l.idDokumen === docId && l.tindakan === 'HANTAR_SEMULA')
+    .sort((a, b) => new Date(b.tarikhMasa) - new Date(a.tarikhMasa))[0];
+  if (semulaEl) {
+    if (logSemula && logSemula.pengguna !== d.namaPenghantar) {
+      setHTML(semulaEl, `<i class="fas fa-redo-alt mr-1"></i>Dihantar semula oleh <b>${logSemula.pengguna}</b> &bull; ${_tarikhSahaja(logSemula.tarikhMasa)}`);
+      semulaEl.classList.remove('hidden');
+    } else {
+      semulaEl.classList.add('hidden');
+    }
+  }
+
   const noteEl = document.getElementById('semakDocNote');
   if (d.catatan && d.catatan !== '-') {
     setHTML(noteEl, `<i class="fas fa-comment-dots mr-1.5"></i>${d.catatan}`);

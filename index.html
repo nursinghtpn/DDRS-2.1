@@ -3449,6 +3449,7 @@ function bukaDetailStatus(docId) {
         const st = LOG_STYLE[l.tindakan] || { bg:'bg-slate-50', border:'border-slate-200', icon:'fa-circle', ic:'text-slate-400', label: l.tindakan };
         const isLast = idx === docLogs.length - 1;
         const catatan = _cleanCatatan(l.tindakan, l.catatan);
+        const tarikh = _tarikhSahaja(l.tarikhMasa);
         return `
         <div class="flex gap-3">
           <div class="flex flex-col items-center flex-shrink-0">
@@ -3458,7 +3459,11 @@ function bukaDetailStatus(docId) {
             ${!isLast ? `<div class="w-0.5 flex-1 bg-slate-200 mt-1 min-h-[14px]"></div>` : ''}
           </div>
           <div class="flex-1 pb-${isLast ? '0' : '4'} min-w-0">
-            <p class="text-xs font-bold text-slate-700">${st.label}</p>
+            <div class="flex items-center gap-2 flex-wrap">
+              <p class="text-xs font-bold text-slate-700">${st.label}</p>
+              ${tarikh ? `<span class="text-[10px] font-medium text-slate-400">${tarikh}</span>` : ''}
+            </div>
+            ${l.tindakan === 'HANTAR_SEMULA' && l.pengguna ? `<p class="text-[11px] font-semibold text-blue-600 mt-0.5"><i class="fas fa-user mr-1"></i>Diproses oleh ${l.pengguna}</p>` : ''}
             ${catatan ? `<p class="text-[11px] text-slate-500 mt-1 bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 italic">${catatan}</p>` : ''}
           </div>
         </div>`;
@@ -3737,9 +3742,9 @@ function renderSemakan() {
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-slate-500 mb-3">
             <span><i class="fas fa-user-tie mr-1.5 text-slate-400"></i><b>Penghantar:</b> ${d.namaPenghantar}</span>
-            <span><i class="far fa-clock mr-1.5 text-slate-400"></i><b>Dihantar:</b> ${_tarikhSahaja(d.tarikhSerahan)}</span>
+            <span><i class="far fa-clock mr-1.5 text-slate-400"></i><b>Dihantar:</b> ${d.tarikhSerahan}</span>
             <span><i class="fas fa-clipboard-check mr-1.5 text-slate-400"></i><b>Unit Kejururawatan:</b> ${d.namaPenyemak || '—'}</span>
-            ${isKeUSM ? `<span><i class="fas fa-user-shield mr-1.5 text-amber-400"></i><b>Penerima USM:</b> ${d.namaPenerimaUSM || '—'}</span>` : `<span><i class="far fa-calendar-check mr-1.5 text-slate-400"></i><b>Tarikh Terima:</b> ${_tarikhSahaja(d.tarikhSemak) || '—'}</span>`}
+            ${isKeUSM ? `<span><i class="fas fa-user-shield mr-1.5 text-amber-400"></i><b>Penerima USM:</b> ${d.namaPenerimaUSM || '—'}</span>` : `<span><i class="far fa-calendar-check mr-1.5 text-slate-400"></i><b>Tarikh Terima:</b> ${d.tarikhSemak && d.tarikhSemak !== '-' ? d.tarikhSemak : '—'}</span>`}
           </div>
 
           ${d.catatanPenyemak && d.catatanPenyemak !== '-'
@@ -4072,7 +4077,7 @@ function renderRekod() {
           ${d.namaPenerimaUSM && d.namaPenerimaUSM !== '-'
             ? `<span class="text-[11px] text-slate-400"><i class="fas fa-user-shield mr-1 text-amber-300"></i>${d.namaUSM && d.namaUSM !== '-' ? d.namaUSM : d.namaPenerimaUSM}</span>`
             : ''}
-          <span class="text-[11px] text-slate-400"><i class="far fa-calendar mr-1 text-slate-300"></i>${_tarikhSahaja(d.tarikhSerahan)}</span>
+          <span class="text-[11px] text-slate-400"><i class="far fa-calendar mr-1 text-slate-300"></i>${d.tarikhSerahan}</span>
         </div>
       </div>
 
@@ -4133,6 +4138,7 @@ function bukaDetailRekod(docId) {
                      .replace(/^dihantar ke usm: [^.]+\.\s*/i,'')
                      .replace(/^sebab: /i,'').trim()
           : '';
+        const tarikh = l.tarikhMasa || ''; // Penyemak/Admin/USM: papar tarikh & MASA penuh
         return `
         <div class="flex gap-3">
           <div class="flex flex-col items-center flex-shrink-0">
@@ -4142,7 +4148,11 @@ function bukaDetailRekod(docId) {
             ${!isLast ? `<div class="w-0.5 flex-1 bg-slate-200 mt-1 min-h-[12px]"></div>` : ''}
           </div>
           <div class="flex-1 pb-${isLast?'0':'3'} min-w-0">
-            <p class="text-xs font-bold text-slate-700">${st.label}</p>
+            <div class="flex items-center gap-2 flex-wrap">
+              <p class="text-xs font-bold text-slate-700">${st.label}</p>
+              ${tarikh ? `<span class="text-[10px] font-medium text-slate-400">${tarikh}</span>` : ''}
+            </div>
+            ${l.tindakan === 'HANTAR_SEMULA' && l.pengguna ? `<p class="text-[11px] font-semibold text-blue-600 mt-0.5"><i class="fas fa-user mr-1"></i>Diproses oleh ${l.pengguna}</p>` : ''}
             ${catatan ? `<p class="text-[11px] text-slate-500 mt-1 bg-slate-50 border border-slate-100 rounded px-2 py-1 italic">${catatan}</p>` : ''}
           </div>
         </div>`;
@@ -4166,12 +4176,12 @@ function bukaDetailRekod(docId) {
       <!-- Grid maklumat aliran -->
       <div class="space-y-0 text-xs">
         ${_row('Penghantar', d.namaPenghantar)}
-        ${_row('Tarikh Hantar', _tarikhSahaja(d.tarikhSerahan))}
+        ${_row('Tarikh Hantar', d.tarikhSerahan)}
         ${d.catatan && d.catatan !== '-' ? _row('Catatan Asal', d.catatan) : ''}
-        ${d.namaPenyemak && d.namaPenyemak !== '-' ? _row('Unit Kejururawatan', d.namaPenyemak, d.tarikhSemak && d.tarikhSemak !== '-' ? ` <span class="text-slate-400 ml-1">${_tarikhSahaja(d.tarikhSemak)}</span>` : '') : ''}
+        ${d.namaPenyemak && d.namaPenyemak !== '-' ? _row('Unit Kejururawatan', d.namaPenyemak, d.tarikhSemak && d.tarikhSemak !== '-' ? ` <span class="text-slate-400 ml-1">${d.tarikhSemak}</span>` : '') : ''}
         ${d.catatanPenyemak && d.catatanPenyemak !== '-' && !d.catatanPenyemak.startsWith('TERIMA') && !d.catatanPenyemak.startsWith('TOLAK') ? _row('Catatan Semakan', d.catatanPenyemak) : ''}
         ${d.namaPenerimaUSM && d.namaPenerimaUSM !== '-' ? _row('Penerima USM', d.namaPenerimaUSM) : ''}
-        ${d.namaUSM && d.namaUSM !== '-' ? _row('Pegawai USM', d.namaUSM, d.tarikhUSM && d.tarikhUSM !== '-' ? ` <span class="text-slate-400 ml-1">${_tarikhSahaja(d.tarikhUSM)}</span>` : '') : ''}
+        ${d.namaUSM && d.namaUSM !== '-' ? _row('Pegawai USM', d.namaUSM, d.tarikhUSM && d.tarikhUSM !== '-' ? ` <span class="text-slate-400 ml-1">${d.tarikhUSM}</span>` : '') : ''}
         ${d.catatanUSM && d.catatanUSM !== '-' ? _row('Catatan USM', d.catatanUSM) : ''}
       </div>
     </div>

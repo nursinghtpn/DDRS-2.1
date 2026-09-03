@@ -767,12 +767,14 @@
                       Jenis Dokumen <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
-                      <i class="fas fa-tags absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
-                      <select name="jenisDokumen" id="selectJenisDokumen" required onchange="_toggleJenisDokumenLainHantar()"
-                        class="w-full pl-11 pr-10 border-2 border-slate-200 rounded-xl p-3.5 text-sm font-medium text-slate-700 bg-white focus:border-blue-500 focus:outline-none transition-colors appearance-none">
+                      <i class="fas fa-tags absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10"></i>
+                      <input type="text" id="selectJenisDokumenCari" placeholder="— Pilih atau taip untuk cari —" autocomplete="off"
+                        class="w-full pl-11 pr-10 border-2 border-slate-200 rounded-xl p-3.5 text-sm font-medium text-slate-700 bg-white focus:border-blue-500 focus:outline-none transition-colors cursor-pointer">
+                      <select name="jenisDokumen" id="selectJenisDokumen" required onchange="_toggleJenisDokumenLainHantar()" class="hidden">
                         <option value="" disabled selected>— Pilih Jenis Dokumen —</option>
                       </select>
                       <i class="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
+                      <div id="selectJenisDokumenDropdown" class="hidden absolute z-40 mt-1 w-full bg-white border-2 border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto"></div>
                     </div>
                     <div id="hantarJenisLainWrap" class="hidden relative mt-2">
                       <i class="fas fa-pen absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 text-sm pointer-events-none"></i>
@@ -991,11 +993,14 @@
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jenis Dokumen <span class="text-slate-400 font-normal normal-case">(pilihan)</span></label>
                   <div class="relative">
-                    <i class="fas fa-tag absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-400 text-sm pointer-events-none"></i>
-                    <select id="sdJenisDokumen" onchange="_toggleJenisDokumenLainSD()" class="w-full pl-10 pr-8 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium focus:border-teal-500 focus:outline-none transition-colors appearance-none bg-white">
+                    <i class="fas fa-tag absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-400 text-sm pointer-events-none z-10"></i>
+                    <input type="text" id="sdJenisDokumenCari" placeholder="— Pilih atau taip untuk cari —" autocomplete="off"
+                      class="w-full pl-10 pr-8 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium focus:border-teal-500 focus:outline-none transition-colors bg-white cursor-pointer">
+                    <select id="sdJenisDokumen" onchange="_toggleJenisDokumenLainSD()" class="hidden">
                       <option value="">— Pilih Jenis Dokumen —</option>
                     </select>
                     <i class="fas fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                    <div id="sdJenisDokumenDropdown" class="hidden absolute z-40 mt-1 w-full bg-white border-2 border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto"></div>
                   </div>
                   <div id="sdJenisDokumenLainWrap" class="hidden relative mt-2">
                     <i class="fas fa-pen absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-400 text-sm pointer-events-none"></i>
@@ -3073,6 +3078,8 @@ function renderFormHantar() {
     const current = sel.value;
     setHTML(sel, `<option value="" disabled selected>— Pilih Jenis Dokumen —</option>` +
       jenisDokumenData.map(j => `<option value="${j}"${j===current?' selected':''}>${j}</option>`).join(''));
+    _pasangCariJenisDokumen('selectJenisDokumenCari', 'selectJenisDokumen', 'selectJenisDokumenDropdown');
+    _segerakInputCariJenisDokumen('selectJenisDokumenCari', 'selectJenisDokumen');
   };
 
   // Jika data sudah ada, papar terus
@@ -3210,6 +3217,8 @@ function resetFormHantar() {
   // Reset dropdown jenis (ke pilih)
   const sel = document.getElementById('selectJenisDokumen');
   if (sel) sel.value = '';
+  const selCari = document.getElementById('selectJenisDokumenCari');
+  if (selCari) selCari.value = '';
   _toggleJenisDokumenLainHantar();
   // Reset senarai nama — kekalkan satu baris kosong sahaja
   const container = document.getElementById('hantarNamaSenarai');
@@ -5379,6 +5388,8 @@ function renderSerahanDalaman() {
     const _isiJenisSD = () => {
       sdJenis.innerHTML = `<option value="">— Pilih Jenis Dokumen —</option>` +
         jenisDokumenData.map(j => `<option value="${j}">${j}</option>`).join('');
+      _pasangCariJenisDokumen('sdJenisDokumenCari', 'sdJenisDokumen', 'sdJenisDokumenDropdown');
+      _segerakInputCariJenisDokumen('sdJenisDokumenCari', 'sdJenisDokumen');
     };
     if (jenisDokumenData.length > 0) {
       _isiJenisSD();
@@ -5790,6 +5801,7 @@ function hantarSerahanDalaman() {
   toast('success','Serahan Dihantar',`Dokumen telah dihantar kepada ${kepadaNama}.`);
   ['sdPerihal','sdCatatan'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   const selJenis = document.getElementById('sdJenisDokumen'); if(selJenis) selJenis.value='';
+  const selJenisCari = document.getElementById('sdJenisDokumenCari'); if(selJenisCari) selJenisCari.value='';
   _toggleJenisDokumenLainSD();
   if(selEl)selEl.value='';
   google.script.run.withSuccessHandler(r=>{if(r){serahanDalamanData=r;_renderSDDashboard();_updateBadgeSD();_renderListSD();_renderSDLog();}}).hantarSerahanDalaman(data);
@@ -6132,6 +6144,58 @@ function _autoTitleCase(el) {
     // Kembalikan kursor ke kedudukan asal (bukan hujung teks)
     el.setSelectionRange(start, end);
   }
+}
+
+// ─────────────────────────────────────────────
+// DROPDOWN JENIS DOKUMEN BOLEH CARI (searchable combobox)
+// Input teks kelihatan + <select> tersembunyi (kekal sumber data untuk
+// kod sedia ada) + panel dropdown tapis-semasa-menaip.
+// ─────────────────────────────────────────────
+function _pasangCariJenisDokumen(searchInputId, selectId, dropdownId) {
+  const input = document.getElementById(searchInputId);
+  const sel   = document.getElementById(selectId);
+  const dd    = document.getElementById(dropdownId);
+  if (!input || !sel || !dd || input._cariTerpasang) return;
+  input._cariTerpasang = true;
+
+  const senaraiPilihan = () => [...sel.options].map(o => o.value).filter(v => v);
+
+  const paparSenarai = (term) => {
+    const semua = senaraiPilihan();
+    const filtered = term ? semua.filter(n => n.toLowerCase().includes(term.toLowerCase())) : semua;
+    if (filtered.length === 0) {
+      setHTML(dd, `<div class="px-4 py-3 text-xs text-slate-400 text-center italic">Tiada jenis dokumen dipadankan</div>`);
+    } else {
+      setHTML(dd, filtered.map(nama => `
+        <button type="button" data-value="${nama.replace(/"/g,'&quot;')}"
+          class="jenis-dok-opt w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-teal-50 hover:text-teal-700 transition-colors border-b border-slate-50 last:border-0">${nama}</button>
+      `).join(''));
+    }
+    dd.classList.remove('hidden');
+  };
+
+  input.addEventListener('focus', () => { paparSenarai(''); input.select(); });
+  input.addEventListener('click', () => { paparSenarai(''); input.select(); });
+  input.addEventListener('input', () => paparSenarai(input.value.trim()));
+  input.addEventListener('blur', () => setTimeout(() => dd.classList.add('hidden'), 150));
+  dd.addEventListener('mousedown', (e) => {
+    const btn = e.target.closest('.jenis-dok-opt');
+    if (!btn) return;
+    e.preventDefault();
+    const val = btn.getAttribute('data-value');
+    input.value = val;
+    sel.value = val;
+    sel.dispatchEvent(new Event('change'));
+    dd.classList.add('hidden');
+  });
+}
+
+// Segerakkan teks input carian dengan nilai <select> semasa (cth: bila dropdown diisi semula data pelayan)
+function _segerakInputCariJenisDokumen(searchInputId, selectId) {
+  const input = document.getElementById(searchInputId);
+  const sel   = document.getElementById(selectId);
+  if (!input || !sel) return;
+  if (document.activeElement !== input) input.value = sel.value || '';
 }
 
 // ─────────────────────────────────────────────

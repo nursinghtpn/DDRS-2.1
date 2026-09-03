@@ -3512,6 +3512,8 @@ function bukaDetailStatus(docId) {
       /^penyemak (terima|tolak) dokumen\. catatan: -?$/i,
       /^usm (terima|tolak) dokumen\. catatan: -?$/i,
       /^dihantar semula selepas query$/i,
+      /^ditandakan selesai terus tanpa hantar ke usm$/i,
+      /^selesai terus oleh unit kejururawatan/i,
     ];
     if (buang.some(r => r.test(catatan.trim()))) return '';
     return catatan.replace(/^dihantar ke usm: [^.]+\.\s*/i, '').replace(/^sebab: /i, '').trim();
@@ -4397,6 +4399,8 @@ function bukaDetailRekod(docId) {
         const st = LOG_STYLE[l.tindakan] || { bg:'bg-slate-50', border:'border-slate-200', icon:'fa-circle', ic:'text-slate-400', label: l.tindakan };
         const isLast = idx === docLogs.length - 1;
         const catatan = l.catatan && l.catatan !== '-'
+          && !/^ditandakan selesai terus tanpa hantar ke usm$/i.test(l.catatan.trim())
+          && !/^selesai terus oleh unit kejururawatan/i.test(l.catatan.trim())
           ? l.catatan.replace(/^dokumen dihantar untuk semakan\. catatan: -?$/i,'')
                      .replace(/^penyemak (terima|tolak) dokumen\. catatan: -?$/i,'')
                      .replace(/^usm (terima|tolak) dokumen\. catatan: -?$/i,'')
@@ -4456,7 +4460,7 @@ function bukaDetailRekod(docId) {
         ${d.catatanPenyemak && d.catatanPenyemak !== '-' && !d.catatanPenyemak.startsWith('TERIMA') && !d.catatanPenyemak.startsWith('TOLAK') ? _row('Catatan Semakan', d.catatanPenyemak) : ''}
         ${d.namaPenerimaUSM && d.namaPenerimaUSM !== '-' ? _row('Penerima USM', d.namaPenerimaUSM) : ''}
         ${d.namaUSM && d.namaUSM !== '-' ? _row('Pegawai USM', d.namaUSM, d.tarikhUSM && d.tarikhUSM !== '-' ? ` <span class="text-slate-400 ml-1">${d.tarikhUSM}</span>` : '') : ''}
-        ${d.catatanUSM && d.catatanUSM !== '-' ? _row('Catatan USM', d.catatanUSM) : ''}
+        ${d.catatanUSM && d.catatanUSM !== '-' && !/^selesai terus oleh unit kejururawatan/i.test(d.catatanUSM.trim()) ? _row('Catatan USM', d.catatanUSM) : ''}
       </div>
     </div>
 

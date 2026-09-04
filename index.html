@@ -1278,6 +1278,22 @@
         <div class="max-w-xl space-y-5">
           <!-- Stats -->
           <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="adminStatsGrid"></div>
+
+          <!-- Baki Kuota E-mel -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5" id="adminKuotaEmelWrap">
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="font-bold text-slate-700 text-sm flex items-center gap-2">
+                <i class="fas fa-envelope text-indigo-500"></i> Baki Kuota E-mel Pemakluman (Hari Ini)
+              </h4>
+              <button onclick="renderAdminPanel()" class="text-xs text-slate-400 hover:text-indigo-600 transition-colors" title="Segar semula">
+                <i class="fas fa-rotate-right"></i>
+              </button>
+            </div>
+            <div id="adminKuotaEmelBody">
+              <p class="text-xs text-slate-400 italic">Memuatkan...</p>
+            </div>
+          </div>
+
           <!-- Danger zone -->
           <div class="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
             <div class="px-6 py-4 bg-red-50 border-b border-red-100 flex items-center gap-2">
@@ -2328,6 +2344,7 @@ if (typeof google === 'undefined' || !google.script) {
   window._gas_dapatkanSenarai = () => [..._db].reverse();
   window._gas_dapatkanLog = () => [..._log].reverse();
   window._gas_dapatkanPengguna = () => _users.map(u=>({id:u.id,name:u.name,role:u.role,modules:u.modules,jawatan:u.jawatan||'',emel:u.emel||'',tel:u.tel||'',status:u.status||'Aktif',unit:u.unit||''}));
+  window._gas_dapatkanBakiKuotaEmel = () => 87; // nilai contoh untuk pratonton — dalam sistem sebenar ini diambil dari MailApp.getRemainingDailyQuota()
   window._gas_dapatkanProfilSaya = (id) => {
     const u = _users.find(x=>x.id===id);
     return u ? {id:u.id, name:u.name, role:u.role, modules:u.modules, jawatan:u.jawatan||'', emel:u.emel||'', tel:u.tel||'', unit:u.unit||''} : null;
@@ -2545,6 +2562,7 @@ if (typeof google === 'undefined' || !google.script) {
     dapatkanSenarai:            window._gas_dapatkanSenarai,
     dapatkanLog:                window._gas_dapatkanLog,
     dapatkanPengguna:           window._gas_dapatkanPengguna,
+    dapatkanBakiKuotaEmel:      window._gas_dapatkanBakiKuotaEmel,
     dapatkanProfilSaya:         window._gas_dapatkanProfilSaya,
     kemaskiniProfil:            window._gas_kemaskiniProfil,
     tukarKataLaluan:            window._gas_tukarKataLaluan,
@@ -6345,6 +6363,45 @@ function renderAdminPanel() {
       <p class="text-2xl font-extrabold">${s.value}</p>
       <p class="text-xs font-medium mt-1">${s.label}</p>
     </div>`).join(''));
+
+  // Baki Kuota E-mel
+  const kuotaBody = document.getElementById('adminKuotaEmelBody');
+  if (kuotaBody) {
+    setHTML(kuotaBody, `<p class="text-xs text-slate-400 italic">Memuatkan...</p>`);
+    google.script.run
+      .withSuccessHandler(baki => _renderKuotaEmel(baki))
+      .withFailureHandler(() => setHTML(kuotaBody, `<p class="text-xs text-red-500"><i class="fas fa-exclamation-circle mr-1"></i>Gagal semak kuota. Cuba segar semula.</p>`))
+      .dapatkanBakiKuotaEmel();
+  }
+}
+
+function _renderKuotaEmel(baki) {
+  const kuotaBody = document.getElementById('adminKuotaEmelBody');
+  if (!kuotaBody || baki === null || baki === undefined) {
+    if (kuotaBody) setHTML(kuotaBody, `<p class="text-xs text-red-500"><i class="fas fa-exclamation-circle mr-1"></i>Gagal semak kuota.</p>`);
+    return;
+  }
+  // Kuota harian: 100 (akaun peribadi) atau 1500 (Google Workspace) — anggar berdasarkan baki tertinggi yang mungkin
+  const anggaranJumlah = baki > 100 ? 1500 : 100;
+  const digunakan = anggaranJumlah - baki;
+  const peratus = Math.max(0, Math.min(100, Math.round((digunakan / anggaranJumlah) * 100)));
+  const warna = peratus >= 90 ? 'bg-red-500' : peratus >= 70 ? 'bg-amber-500' : 'bg-emerald-500';
+  const warnaTeks = peratus >= 90 ? 'text-red-600' : peratus >= 70 ? 'text-amber-600' : 'text-emerald-600';
+
+  setHTML(kuotaBody, `
+    <div class="flex items-end justify-between mb-2">
+      <div>
+        <span class="text-2xl font-extrabold ${warnaTeks}">${baki}</span>
+        <span class="text-sm text-slate-400"> / ${anggaranJumlah} penerima baki</span>
+      </div>
+      <span class="text-xs font-semibold ${warnaTeks}">${digunakan} digunakan (${peratus}%)</span>
+    </div>
+    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+      <div class="h-full rounded-full ${warna} transition-all duration-500" style="width:${peratus}%"></div>
+    </div>
+    ${peratus >= 90 ? `<p class="text-[11px] text-red-500 mt-2"><i class="fas fa-triangle-exclamation mr-1"></i>Kuota hampir habis — e-mel pemakluman mungkin gagal dihantar hari ini.</p>` : ''}
+    <p class="text-[10px] text-slate-400 mt-2">Kuota reset 24 jam selepas e-mel pertama dihantar (bukan tengah malam tepat). Anggaran jenis akaun dikira automatik berdasarkan baki tertinggi.</p>
+  `);
 }
 
 async function handlePadamRekod() {

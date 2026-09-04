@@ -2176,6 +2176,19 @@
   </div>
 </div>
 
+  <!-- Bar Muatan Global — muncul serta-merta setiap kali panggilan ke pelayan bermula -->
+  <div id="barMuatanGlobal" style="position:fixed;top:0;left:0;width:100%;height:3px;z-index:9999;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .25s ease;">
+    <div id="barMuatanDalam" style="height:100%;width:35%;background:linear-gradient(90deg,#2563eb,#7c3aed,#2563eb);border-radius:2px;"></div>
+  </div>
+  <style>
+    #barMuatanGlobal.bar-muatan-aktif { opacity: 1; }
+    #barMuatanGlobal.bar-muatan-aktif #barMuatanDalam { animation: barMuatanGerak 1s ease-in-out infinite; }
+    @keyframes barMuatanGerak {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(385%); }
+    }
+  </style>
+
 <!-- ═══════════ SCRIPT ═══════════ -->
 <script>
 // ─────────────────────────────────────────────
@@ -2637,6 +2650,73 @@ if (typeof google === 'undefined' || !google.script) {
     }
   } } };
 }
+
+// ─────────────────────────────────────────────
+// PENUNJUK MUATAN GLOBAL — bar halus di atas skrin
+// ─────────────────────────────────────────────
+// Membungkus google.script.run (sama ada native/shim Vercel/mock — tidak kira)
+// supaya SETIAP panggilan ke pelayan automatik tunjuk bar muatan serta-merta
+// bila bermula, dan sembunyi bila selesai (berjaya/gagal). Ini bermakna semua
+// 30+ tempat sedia ada yang guna google.script.run terus dapat maklum balas
+// visual segera TANPA perlu ubah kod tersebut satu persatu.
+let _bilanganMuatanAktif = 0;
+
+function _tunjukBarMuatan() {
+  _bilanganMuatanAktif++;
+  const bar = document.getElementById('barMuatanGlobal');
+  if (bar) { bar.classList.add('bar-muatan-aktif'); bar.style.opacity = '1'; }
+}
+
+function _sembunyikanBarMuatan() {
+  _bilanganMuatanAktif = Math.max(0, _bilanganMuatanAktif - 1);
+  if (_bilanganMuatanAktif === 0) {
+    const bar = document.getElementById('barMuatanGlobal');
+    if (bar) { bar.classList.remove('bar-muatan-aktif'); bar.style.opacity = '0'; }
+  }
+}
+
+(function _pasangPenunjukMuatanGlobal() {
+  if (typeof google === 'undefined' || !google.script) return;
+  const scriptObj = google.script;
+  const deskriptor = Object.getOwnPropertyDescriptor(scriptObj, 'run');
+  // PENTING: jika 'run' BUKAN getter (nilai tetap, cth mod mock), simpan snapshot
+  // SEKALI sahaja — elak baca semula scriptObj.run selepas ia digantikan (punca gelung tak terhingga)
+  const ambilRunAsal = (deskriptor && deskriptor.get)
+    ? () => deskriptor.get.call(scriptObj)
+    : (() => { const nilaiTetap = scriptObj.run; return () => nilaiTetap; })();
+
+  function bungkusRantai(objRun) {
+    return new Proxy({}, {
+      get(target, prop) {
+        if (prop === 'withSuccessHandler') {
+          return (cb) => bungkusRantai(objRun.withSuccessHandler((...a) => { _sembunyikanBarMuatan(); if (cb) cb(...a); }));
+        }
+        if (prop === 'withFailureHandler') {
+          return (cb) => bungkusRantai(objRun.withFailureHandler((...a) => { _sembunyikanBarMuatan(); if (cb) cb(...a); }));
+        }
+        if (prop === 'withUserObject') {
+          return (...a) => bungkusRantai(objRun.withUserObject(...a));
+        }
+        // Nama fungsi sebenar (titik akhir rantaian) — panggilan sebenar bermula di sini
+        return (...args) => {
+          _tunjukBarMuatan();
+          // Jaringan keselamatan: auto-sembunyi selepas 20 saat walaupun handler tidak dipanggil
+          setTimeout(_sembunyikanBarMuatan, 20000);
+          return objRun[prop](...args);
+        };
+      }
+    });
+  }
+
+  try {
+    Object.defineProperty(scriptObj, 'run', {
+      configurable: true,
+      get() { return bungkusRantai(ambilRunAsal()); }
+    });
+  } catch (e) {
+    // Jika tidak boleh diubah suai (jarang berlaku) — langkau senyap, sistem tetap berfungsi asal
+  }
+})();
 
 // ─────────────────────────────────────────────
 // STATE

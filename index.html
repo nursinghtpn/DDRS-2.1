@@ -3036,6 +3036,12 @@ function _syncNow() {
       if (!sd) return;
       serahanDalamanData = sd;
       _updateNotifChatBadge();
+      // Jika panel notifikasi SEDANG TERBUKA, segar semula kandungannya juga —
+      // elak ia "kekal" statik walaupun ada perbualan/mesej baharu di tempat lain
+      const ddNotif = document.getElementById('notifChatDropdown');
+      if (ddNotif && !ddNotif.classList.contains('hidden')) {
+        _renderNotifChatDropdown();
+      }
       const active = document.querySelector('.tab-content.active');
       if (active && active.id === 'tab-serahan_dalaman') {
         _renderSDDashboard();

@@ -783,7 +783,7 @@
                         <option value="" disabled selected>— Pilih Jenis Dokumen —</option>
                       </select>
                       <i class="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
-                      <div id="selectJenisDokumenDropdown" class="hidden absolute z-40 mt-1 w-full bg-white border-2 border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto"></div>
+                      <div id="selectJenisDokumenDropdown" class="hidden z-[500] bg-white border-2 border-slate-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto"></div>
                     </div>
                     <div id="hantarJenisLainWrap" class="hidden relative mt-2">
                       <i class="fas fa-pen absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 text-sm pointer-events-none"></i>
@@ -1009,7 +1009,7 @@
                       <option value="">— Pilih Jenis Dokumen —</option>
                     </select>
                     <i class="fas fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-                    <div id="sdJenisDokumenDropdown" class="hidden absolute z-40 mt-1 w-full bg-white border-2 border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto"></div>
+                    <div id="sdJenisDokumenDropdown" class="hidden z-[500] bg-white border-2 border-slate-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto"></div>
                   </div>
                   <div id="sdJenisDokumenLainWrap" class="hidden relative mt-2">
                     <i class="fas fa-pen absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-400 text-sm pointer-events-none"></i>
@@ -1151,7 +1151,7 @@
                       <option value="">— Pilih Jenis Dokumen —</option>
                     </select>
                     <i class="fas fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-                    <div id="dwJenisDokumenDropdown" class="hidden absolute z-40 mt-1 w-full bg-white border-2 border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto"></div>
+                    <div id="dwJenisDokumenDropdown" class="hidden z-[500] bg-white border-2 border-slate-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto"></div>
                   </div>
                   <div id="dwJenisDokumenLainWrap" class="hidden relative mt-2">
                     <i class="fas fa-pen absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-400 text-sm pointer-events-none"></i>
@@ -6571,6 +6571,19 @@ function _pasangCariJenisDokumen(searchInputId, selectId, dropdownId) {
   if (!input || !sel || !dd || input._cariTerpasang) return;
   input._cariTerpasang = true;
 
+  // PENTING: guna position:fixed (dikira semula setiap kali dibuka) supaya dropdown
+  // tidak terpotong oleh bekas induk yang ada "overflow-hidden" (cth: kad borang
+  // bersudut bulat), dan sentiasa terbit di ATAS elemen lain tanpa isu susunan lapisan.
+  const kedudukankanDropdown = () => {
+    const rect = input.getBoundingClientRect();
+    dd.style.position = 'fixed';
+    dd.style.top      = (rect.bottom + 4) + 'px';
+    dd.style.left     = rect.left + 'px';
+    dd.style.width    = rect.width + 'px';
+    dd.style.margin   = '0';
+    dd.style.zIndex   = '9999'; // ditetapkan terus (bukan kelas Tailwind) — jamin sentiasa berkesan
+  };
+
   const senaraiPilihan = () => [...sel.options].map(o => o.value).filter(v => v);
 
   const paparSenarai = (term) => {
@@ -6584,6 +6597,7 @@ function _pasangCariJenisDokumen(searchInputId, selectId, dropdownId) {
           class="jenis-dok-opt w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-teal-50 hover:text-teal-700 transition-colors border-b border-slate-50 last:border-0">${nama}</button>
       `).join(''));
     }
+    kedudukankanDropdown();
     dd.classList.remove('hidden');
   };
 
@@ -6601,6 +6615,9 @@ function _pasangCariJenisDokumen(searchInputId, selectId, dropdownId) {
     sel.dispatchEvent(new Event('change'));
     dd.classList.add('hidden');
   });
+  // Kekalkan kedudukan tepat jika halaman di-scroll/resize semasa dropdown terbuka
+  window.addEventListener('scroll', () => { if (!dd.classList.contains('hidden')) kedudukankanDropdown(); }, true);
+  window.addEventListener('resize', () => { if (!dd.classList.contains('hidden')) kedudukankanDropdown(); });
 }
 
 // Segerakkan teks input carian dengan nilai <select> semasa (cth: bila dropdown diisi semula data pelayan)

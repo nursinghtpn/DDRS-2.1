@@ -1260,7 +1260,15 @@
             <h3 class="font-bold text-slate-700">Senarai Akaun Pengguna</h3>
             <p class="text-xs text-slate-400 mt-0.5"><span id="penggunaJumlahTeks">0 pengguna</span></p>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 flex-wrap">
+            <div class="relative">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+              <input type="text" id="penggunaCari" placeholder="Cari nama atau emel..." oninput="_cariPengguna()"
+                class="pl-8 pr-8 py-2 border-2 border-slate-200 rounded-lg text-xs font-medium focus:border-blue-500 focus:outline-none transition-colors w-48 md:w-56">
+              <button id="penggunaCariClear" onclick="_kosongkanCarianPengguna()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors">
+                <i class="fas fa-times-circle text-xs"></i>
+              </button>
+            </div>
             <div class="flex items-center gap-1.5">
               <label class="text-xs font-semibold text-slate-500">Papar:</label>
               <select id="penggunaSaizHalaman" onchange="_tukarSaizHalamanPengguna()"
@@ -5009,6 +5017,24 @@ function renderPengguna() {
 
 let _penggunaHalamanSemasa = 1;
 let _penggunaSaizHalaman = 20;
+let _penggunaCarianTerm = '';
+
+function _cariPengguna() {
+  const input = document.getElementById('penggunaCari');
+  _penggunaCarianTerm = (input?.value || '').trim().toLowerCase();
+  _penggunaHalamanSemasa = 1; // reset ke halaman pertama bila carian berubah
+  document.getElementById('penggunaCariClear')?.classList.toggle('hidden', !_penggunaCarianTerm);
+  _renderPenggunaList(usersData);
+}
+
+function _kosongkanCarianPengguna() {
+  const input = document.getElementById('penggunaCari');
+  if (input) input.value = '';
+  _penggunaCarianTerm = '';
+  _penggunaHalamanSemasa = 1;
+  document.getElementById('penggunaCariClear')?.classList.add('hidden');
+  _renderPenggunaList(usersData);
+}
 
 function _tukarSaizHalamanPengguna() {
   _penggunaSaizHalaman = parseInt(document.getElementById('penggunaSaizHalaman').value, 10) || 20;
@@ -5021,17 +5047,34 @@ function _pergiHalamanPengguna(halaman) {
   _renderPenggunaList(usersData);
 }
 
-function _renderPenggunaList(users) {
+function _renderPenggunaList(usersAsal) {
   const container = document.getElementById('penggunaTableBody');
   const paginasiEl = document.getElementById('penggunaPaginasi');
   const jumlahEl   = document.getElementById('penggunaJumlahTeks');
   if (!container) return;
 
-  const jumlahBesar = (users || []).length;
-  if (jumlahEl) jumlahEl.textContent = jumlahBesar === 1 ? '1 pengguna' : `${jumlahBesar} pengguna`;
+  const jumlahKeseluruhan = (usersAsal || []).length;
 
-  if (!users || users.length === 0) {
-    setHTML(container, `<div class="px-5 py-10 text-center text-xs text-slate-400"><i class="fas fa-users text-3xl text-slate-200 block mb-2"></i>Tiada pengguna</div>`);
+  // ── Terapkan carian (nama atau emel) ──
+  const term = _penggunaCarianTerm;
+  const users = term
+    ? (usersAsal || []).filter(u =>
+        (u.name || '').toLowerCase().includes(term) ||
+        (u.emel || '').toLowerCase().includes(term) ||
+        (u.id || '').toLowerCase().includes(term))
+    : (usersAsal || []);
+
+  const jumlahBesar = users.length;
+  if (jumlahEl) {
+    jumlahEl.textContent = term
+      ? `${jumlahBesar} daripada ${jumlahKeseluruhan} pengguna (carian: "${_penggunaCarianTerm}")`
+      : (jumlahKeseluruhan === 1 ? '1 pengguna' : `${jumlahKeseluruhan} pengguna`);
+  }
+
+  if (jumlahBesar === 0) {
+    setHTML(container, term
+      ? `<div class="px-5 py-10 text-center text-xs text-slate-400"><i class="fas fa-search text-3xl text-slate-200 block mb-2"></i>Tiada pengguna sepadan carian "${_penggunaCarianTerm}"</div>`
+      : `<div class="px-5 py-10 text-center text-xs text-slate-400"><i class="fas fa-users text-3xl text-slate-200 block mb-2"></i>Tiada pengguna</div>`);
     if (paginasiEl) paginasiEl.classList.add('hidden');
     return;
   }

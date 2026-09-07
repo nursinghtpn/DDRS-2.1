@@ -1288,8 +1288,9 @@
           <div class="bg-slate-50 border-b border-slate-200 px-5 py-3 grid grid-cols-12 gap-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
             <span class="col-span-4">Pengguna</span>
             <span class="col-span-2">Peranan</span>
-            <span class="col-span-2">Status</span>
-            <span class="col-span-2">Modul</span>
+            <span class="col-span-2">Wad/Unit</span>
+            <span class="col-span-1">Status</span>
+            <span class="col-span-1">Modul</span>
             <span class="col-span-2 text-right">Tindakan</span>
           </div>
           <div id="penggunaTableBody" class="divide-y divide-slate-100"></div>
@@ -5284,14 +5285,18 @@ function _renderPenggunaList(usersAsal) {
 
   const jumlahKeseluruhan = (usersAsal || []).length;
 
+  // ── Susun ikut abjad (nama, tidak kisah huruf besar/kecil) ──
+  const usersDisusun = [...(usersAsal || [])].sort((a, b) =>
+    (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase(), 'ms'));
+
   // ── Terapkan carian (nama atau emel) ──
   const term = _penggunaCarianTerm;
   const users = term
-    ? (usersAsal || []).filter(u =>
+    ? usersDisusun.filter(u =>
         (u.name || '').toLowerCase().includes(term) ||
         (u.emel || '').toLowerCase().includes(term) ||
         (u.id || '').toLowerCase().includes(term))
-    : (usersAsal || []);
+    : usersDisusun;
 
   const jumlahBesar = users.length;
   if (jumlahEl) {
@@ -5330,10 +5335,11 @@ function _renderPenggunaList(usersAsal) {
       <div class="col-span-2">
         <span class="text-xs font-bold px-2 py-0.5 rounded-full border ${ROLE_STYLE[u.role]||'bg-slate-100 text-slate-600 border-slate-200'}">${ROLE_LABEL[u.role]||u.role}</span>
       </div>
-      <div class="col-span-2">
+      <div class="col-span-2 text-xs text-slate-600 truncate">${u.unit ? `<i class="fas fa-hospital text-slate-300 mr-1"></i>${u.unit}` : '<span class="text-slate-300">—</span>'}</div>
+      <div class="col-span-1">
         <span class="text-[11px] font-bold px-2 py-0.5 rounded-full border ${st.cls} flex items-center gap-1 w-fit"><i class="fas ${st.icon} text-[10px]"></i>${u.status || 'Aktif'}</span>
       </div>
-      <div class="col-span-2 text-xs text-slate-500 truncate">${Array.isArray(u.modules)?u.modules.join(', '):u.modules}</div>
+      <div class="col-span-1 text-xs text-slate-500 truncate">${Array.isArray(u.modules)?u.modules.join(', '):u.modules}</div>
       <div class="col-span-2 flex items-center justify-end gap-1">
         <button onclick="openModalPengguna('${u.id}')" class="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors"><i class="fas fa-edit text-sm"></i></button>
         ${u.id !== 'admin' ? `<button onclick="hapusPengguna('${u.id}')" class="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"><i class="fas fa-trash-alt text-sm"></i></button>` : ''}

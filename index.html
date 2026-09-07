@@ -1265,7 +1265,8 @@
             <div class="relative">
               <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
               <input type="text" id="penggunaCari" placeholder="Cari nama atau emel..." oninput="_cariPengguna()"
-                class="pl-8 pr-8 py-2 border-2 border-slate-200 rounded-lg text-xs font-medium focus:border-blue-500 focus:outline-none transition-colors w-48 md:w-56">
+                autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other"
+                class="pl-8 pr-8 py-2 border-2 border-slate-200 rounded-lg text-xs font-medium focus:border-blue-500 focus:outline-none transition-colors w-72 md:w-80">
               <button id="penggunaCariClear" onclick="_kosongkanCarianPengguna()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors">
                 <i class="fas fa-times-circle text-xs"></i>
               </button>
@@ -5237,6 +5238,12 @@ const STATUS_AKAUN_STYLE = {
 };
 
 function renderPengguna() {
+  // Reset carian setiap kali halaman ini dibuka (elak sisa carian lama/auto-fill pelayar)
+  _penggunaCarianTerm = '';
+  const inputCari = document.getElementById('penggunaCari');
+  if (inputCari) inputCari.value = '';
+  document.getElementById('penggunaCariClear')?.classList.add('hidden');
+
   // Render terus dari cache — tiada loading
   _renderPenggunaList(usersData);
 

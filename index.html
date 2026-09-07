@@ -1817,6 +1817,63 @@
   </div>
 </div>
 
+<!-- ═══════════ MODAL: EDIT DOKUMEN (Kakitangan) ═══════════ -->
+<div id="modalEditDokumen" class="hidden fixed inset-0 z-[60] modal-bg flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col">
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex items-center justify-between flex-shrink-0">
+      <div>
+        <h3 class="font-bold text-white flex items-center gap-2"><i class="fas fa-edit text-blue-200"></i> Edit Dokumen</h3>
+        <p class="text-blue-200 text-xs mt-0.5">Hanya boleh diedit sebelum Unit Kejururawatan bertindak</p>
+      </div>
+      <button onclick="closeModal('modalEditDokumen')" class="text-blue-200 hover:text-white transition"><i class="fas fa-times text-xl"></i></button>
+    </div>
+    <div class="overflow-y-auto flex-1 p-5 space-y-4">
+      <input type="hidden" id="editDocId">
+
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jenis Dokumen <span class="text-slate-400 font-normal normal-case">(pilihan)</span></label>
+        <div class="relative">
+          <i class="fas fa-tag absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-400 text-sm pointer-events-none z-10"></i>
+          <input type="text" id="editJenisDokumenCari" placeholder="— Pilih atau taip untuk cari —" autocomplete="off"
+            class="w-full pl-10 pr-8 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium focus:border-blue-500 focus:outline-none transition-colors bg-white cursor-pointer">
+          <select id="editJenisDokumen" onchange="_toggleJenisDokumenLainEdit()" class="hidden">
+            <option value="">— Pilih Jenis Dokumen —</option>
+          </select>
+          <i class="fas fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+          <div id="editJenisDokumenDropdown" class="hidden bg-white border-2 border-slate-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto"></div>
+        </div>
+        <div id="editJenisDokumenLainWrap" class="hidden relative mt-2">
+          <i class="fas fa-pen absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-400 text-sm pointer-events-none"></i>
+          <input type="text" id="editJenisDokumenLain" placeholder="Nyatakan jenis dokumen..." oninput="_autoTitleCase(this)"
+            class="w-full pl-10 pr-3 py-2.5 border-2 border-indigo-200 rounded-xl text-sm font-medium focus:border-blue-500 focus:outline-none transition-colors">
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Nama Penuh <span class="text-red-500">*</span></label>
+          <button type="button" onclick="tambahBarisNamaEdit()" class="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+            <i class="fas fa-plus-circle"></i> Tambah Nama
+          </button>
+        </div>
+        <div id="editNamaSenarai" class="space-y-2"></div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan <span class="text-slate-400 font-normal normal-case">(pilihan)</span></label>
+        <textarea id="editCatatan" rows="2" placeholder="Maklumat tambahan..."
+          class="w-full border-2 border-slate-200 rounded-xl p-3 focus:border-blue-500 focus:outline-none transition-colors text-sm resize-none"></textarea>
+      </div>
+    </div>
+    <div class="flex gap-3 p-5 pt-0 flex-shrink-0">
+      <button onclick="closeModal('modalEditDokumen')" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition-colors">Batal</button>
+      <button onclick="simpanEditDokumen()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+        <i class="fas fa-save"></i> Simpan Perubahan
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ MODAL: QUERY (PENYEMAK / USM) ═══════════ -->
 <div id="modalQuery" class="hidden fixed inset-0 z-[60] modal-bg flex items-center justify-center p-4">
   <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col">
@@ -3380,8 +3437,119 @@ function _toggleJenisDokumenLainHantar() {
   }
 }
 
-// ─────────────────────────────────────────────
-// SENARAI NAMA DINAMIK (Borang Serahan)
+// ═══════════════════════════════════════════════
+// EDIT & PADAM DOKUMEN (Kakitangan) — hanya selagi status masih 'Dihantar'
+// ═══════════════════════════════════════════════
+function _toggleJenisDokumenLainEdit() {
+  const sel  = document.getElementById('editJenisDokumen');
+  const wrap = document.getElementById('editJenisDokumenLainWrap');
+  const inp  = document.getElementById('editJenisDokumenLain');
+  if (!sel || !wrap || !inp) return;
+  if (sel.value === 'Lain-lain Dokumen') {
+    wrap.classList.remove('hidden');
+  } else {
+    wrap.classList.add('hidden');
+    inp.value = '';
+  }
+}
+
+function bukaModalEditDokumen(docId) {
+  const d = db.find(x => x.id === docId);
+  if (!d) return toast('error', 'Ralat', 'Dokumen tidak dijumpai.');
+  if (d.status !== 'Dihantar' || d.idPenghantar !== currentUser.id) {
+    return toast('error', 'Tidak Dibenarkan', 'Dokumen ini tidak lagi boleh diedit.');
+  }
+
+  document.getElementById('editDocId').value = docId;
+  document.getElementById('editCatatan').value = (d.catatan && d.catatan !== '-') ? d.catatan : '';
+
+  // Isi senarai nama sedia ada
+  const container = document.getElementById('editNamaSenarai');
+  container.innerHTML = '';
+  const namaSenarai = (d.namaSenarai && d.namaSenarai.length) ? d.namaSenarai : (d.namaDokumen ? [d.namaDokumen] : []);
+  if (namaSenarai.length === 0) tambahBarisNamaEdit();
+  else namaSenarai.forEach(n => tambahBarisNamaEdit(n));
+
+  // Isi dropdown Jenis Dokumen (boleh cari) — sedia semua pilihan + nilai semasa
+  const selJenis = document.getElementById('editJenisDokumen');
+  const isJenisTersenarai = jenisDokumenData.includes(d.jenisDokumen);
+  selJenis.innerHTML = `<option value="">— Pilih Jenis Dokumen —</option>` +
+    jenisDokumenData.map(j => `<option value="${j}"${j===d.jenisDokumen?' selected':''}>${j}</option>`).join('');
+  _pasangCariJenisDokumen('editJenisDokumenCari', 'editJenisDokumen', 'editJenisDokumenDropdown');
+  if (d.jenisDokumen && d.jenisDokumen !== '-' && !isJenisTersenarai) {
+    // jenis semasa ialah teks custom ("Lain-lain") — set ke 'Lain-lain Dokumen' + isi medan custom
+    selJenis.value = 'Lain-lain Dokumen';
+    if (![...selJenis.options].some(o => o.value === 'Lain-lain Dokumen')) {
+      selJenis.insertAdjacentHTML('beforeend', `<option value="Lain-lain Dokumen">Lain-lain Dokumen</option>`);
+      selJenis.value = 'Lain-lain Dokumen';
+    }
+    document.getElementById('editJenisDokumenLain').value = d.jenisDokumen;
+  }
+  document.getElementById('editJenisDokumenCari').value = selJenis.value || '';
+  _toggleJenisDokumenLainEdit();
+
+  document.getElementById('modalEditDokumen').classList.remove('hidden');
+}
+
+function simpanEditDokumen() {
+  const docId = document.getElementById('editDocId').value;
+  let jenis   = document.getElementById('editJenisDokumen').value || '';
+  const catatan = document.getElementById('editCatatan').value.trim() || '-';
+
+  if (jenis === 'Lain-lain Dokumen') {
+    const jenisLain = document.getElementById('editJenisDokumenLain')?.value.trim() || '';
+    if (!jenisLain) return toast('error', 'Tidak Lengkap', 'Sila nyatakan jenis dokumen.');
+    jenis = jenisLain;
+  }
+  const namaSenarai = _dapatkanSenaraiNamaEdit();
+  if (namaSenarai.length === 0) return toast('error', 'Tidak Lengkap', 'Sila isi sekurang-kurangnya satu nama penuh.');
+
+  const namaDokumenBaharu = _formatSenaraiNama(namaSenarai);
+  const d = db.find(x => x.id === docId);
+  if (!d) return;
+
+  const dataBaharu = { jenisDokumen: jenis || '-', namaDokumen: namaDokumenBaharu, namaSenarai, catatan };
+
+  _optimistic(
+    () => {
+      d.jenisDokumen = dataBaharu.jenisDokumen;
+      d.namaDokumen  = dataBaharu.namaDokumen;
+      d.namaSenarai  = dataBaharu.namaSenarai;
+      d.catatan      = dataBaharu.catatan;
+      logData.unshift({logId:'LOG'+Date.now(), idDokumen:docId, namaDokumen:namaDokumenBaharu, pengguna:currentUser.name, peranan:'user', tindakan:'PENGHANTAR_KEMASKINI', catatan:'Dokumen dikemaskini oleh penghantar', tarikhMasa:_fmtTarikhMasa(new Date())});
+    },
+    'editDokumenKakitangan', [docId, currentUser.id, currentUser.name, dataBaharu],
+    'Dokumen berjaya dikemaskini.',
+    'Dikemaskini'
+  );
+  closeModal('modalEditDokumen');
+}
+
+async function padamDokumenSendiri(docId) {
+  const d = db.find(x => x.id === docId);
+  if (!d) return;
+  if (d.status !== 'Dihantar' || d.idPenghantar !== currentUser.id) {
+    return toast('error', 'Tidak Dibenarkan', 'Dokumen ini tidak lagi boleh dipadam.');
+  }
+  const ok = await _confirm(
+    `Dokumen <b>"${d.namaDokumen}"</b> akan dipadam secara kekal. Tindakan ini tidak boleh dibatalkan.`,
+    'Padam Dokumen Ini?', 'amaran', 'Ya, Padam'
+  );
+  if (!ok) return;
+
+  _optimistic(
+    () => {
+      const idx = db.findIndex(x => x.id === docId);
+      if (idx > -1) db.splice(idx, 1);
+      logData.unshift({logId:'LOG'+Date.now(), idDokumen:docId, namaDokumen:d.namaDokumen, pengguna:currentUser.name, peranan:'user', tindakan:'PENGHANTAR_PADAM', catatan:'Dokumen dipadam oleh penghantar sebelum diproses Unit Kejururawatan.', tarikhMasa:_fmtTarikhMasa(new Date())});
+    },
+    'padamDokumenKakitangan', [docId, currentUser.id, currentUser.name],
+    'Dokumen berjaya dipadam.',
+    'Dipadam'
+  );
+}
+
+
 // ─────────────────────────────────────────────
 let _hantarNamaBarisId = 0;
 
@@ -3427,6 +3595,54 @@ function _kemaskiniButangBuangNama() {
 
 function _dapatkanSenaraiNamaHantar() {
   return [...document.querySelectorAll('#hantarNamaSenarai .hantar-nama-input')]
+    .map(el => el.value.trim().toUpperCase())
+    .filter(v => v);
+}
+
+// ── Set fungsi BERASINGAN khusus untuk Modal Edit Dokumen (Kakitangan) ──
+// (dipisahkan daripada fungsi borang Hantar Dokumen di atas untuk elak risiko konflik/pecah)
+let _editNamaBarisId = 0;
+
+function _editBarisNamaHTML(idBaris, nilai) {
+  return `
+  <div class="flex items-center gap-2" data-edit-baris-nama="${idBaris}">
+    <div class="relative flex-1">
+      <i class="fas fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+      <input type="text" value="${nilai || ''}" placeholder="NAMA PENUH..." oninput="_autoUpper(this)"
+        class="edit-nama-input w-full pl-9 pr-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium uppercase focus:border-blue-500 focus:outline-none transition-colors">
+    </div>
+    <button type="button" onclick="buangBarisNamaEdit(${idBaris})"
+      class="edit-nama-buang flex-shrink-0 w-9 h-9 rounded-xl bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors">
+      <i class="fas fa-times text-sm"></i>
+    </button>
+  </div>`;
+}
+
+function tambahBarisNamaEdit(nilai) {
+  const container = document.getElementById('editNamaSenarai');
+  if (!container) return;
+  _editNamaBarisId++;
+  container.insertAdjacentHTML('beforeend', _editBarisNamaHTML(_editNamaBarisId, nilai));
+  _kemaskiniButangBuangNamaEdit();
+}
+
+function buangBarisNamaEdit(idBaris) {
+  const container = document.getElementById('editNamaSenarai');
+  const baris = container?.querySelector(`[data-edit-baris-nama="${idBaris}"]`);
+  if (baris) baris.remove();
+  if (container && container.children.length === 0) tambahBarisNamaEdit();
+  _kemaskiniButangBuangNamaEdit();
+}
+
+function _kemaskiniButangBuangNamaEdit() {
+  const container = document.getElementById('editNamaSenarai');
+  if (!container) return;
+  const bilangan = container.children.length;
+  container.querySelectorAll('.edit-nama-buang').forEach(btn => btn.classList.toggle('hidden', bilangan <= 1));
+}
+
+function _dapatkanSenaraiNamaEdit() {
+  return [...document.querySelectorAll('#editNamaSenarai .edit-nama-input')]
     .map(el => el.value.trim().toUpperCase())
     .filter(v => v);
 }
@@ -3720,6 +3936,15 @@ function renderStatus() {
                   <i class="fas fa-redo-alt text-[11px]"></i> Hantar Semula
                 </button>`
               : ''}
+            ${(d.status === 'Dihantar' && d.idPenghantar === currentUser.id) ? `
+              <button onclick="bukaModalEditDokumen('${d.id}')"
+                class="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1.5 border border-blue-100">
+                <i class="fas fa-edit text-[11px]"></i> Edit
+              </button>
+              <button onclick="padamDokumenSendiri('${d.id}')"
+                class="px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1.5 border border-red-100">
+                <i class="fas fa-trash-alt text-[11px]"></i> Padam
+              </button>` : ''}
           </div>
         </div>`;
       }).join('')}
@@ -3757,6 +3982,8 @@ function bukaDetailStatus(docId) {
     USM_TOLAK:        { bg:'bg-red-50',    border:'border-red-200',    icon:'fa-ban',                ic:'text-red-500',    label:'Ditolak – Unit Sumber Manusia' },
     USM_QUERY:        { bg:'bg-orange-50', border:'border-orange-300', icon:'fa-question-circle',    ic:'text-orange-600', label:'Query – Unit Sumber Manusia' },
     PENYEMAK_SELESAI: { bg:'bg-green-50',  border:'border-green-200',  icon:'fa-check-double',       ic:'text-green-600',  label:'Selesai' },
+    PENGHANTAR_KEMASKINI: { bg:'bg-blue-50', border:'border-blue-200', icon:'fa-pen',              ic:'text-blue-500',   label:'Dikemaskini oleh Penghantar' },
+    PENGHANTAR_PADAM:     { bg:'bg-red-50',  border:'border-red-200',  icon:'fa-trash-alt',        ic:'text-red-500',    label:'Dipadam oleh Penghantar' },
   };
 
   const _cleanCatatan = (tindakan, catatan) => {
@@ -4638,6 +4865,8 @@ function bukaDetailRekod(docId) {
     USM_TOLAK:        { bg:'bg-red-50',    border:'border-red-200',    icon:'fa-ban',                ic:'text-red-500',    label:'Ditolak – Unit Sumber Manusia' },
     USM_QUERY:        { bg:'bg-orange-50', border:'border-orange-300', icon:'fa-question-circle',    ic:'text-orange-600', label:'Query – Unit Sumber Manusia' },
     PENYEMAK_SELESAI: { bg:'bg-green-50',  border:'border-green-200',  icon:'fa-check-double',       ic:'text-green-600',  label:'Selesai' },
+    PENGHANTAR_KEMASKINI: { bg:'bg-blue-50', border:'border-blue-200', icon:'fa-pen',              ic:'text-blue-500',   label:'Dikemaskini oleh Penghantar' },
+    PENGHANTAR_PADAM:     { bg:'bg-red-50',  border:'border-red-200',  icon:'fa-trash-alt',        ic:'text-red-500',    label:'Dipadam oleh Penghantar' },
   };
 
   const _row = (label, value, extra='') => value && value !== '-'
@@ -5164,20 +5393,27 @@ function _renderPermohonanMenunggu(list) {
   wrap.classList.remove('hidden');
 
   setHTML(container, list.map(p => `
-    <div class="flex items-center gap-4 px-5 py-3.5 flex-wrap">
-      <div class="w-9 h-9 rounded-full bg-amber-200 flex items-center justify-center font-bold text-amber-800 text-sm flex-shrink-0">${(p.name||'-').charAt(0).toUpperCase()}</div>
-      <div class="flex-1 min-w-[180px]">
-        <p class="text-sm font-bold text-slate-800">${(p.name||'-').toUpperCase()}</p>
-        <p class="text-xs text-slate-500">${p.emel}${p.jawatan ? ' &bull; ' + p.jawatan : ''}${p.tel ? ' &bull; ' + p.tel : ''}</p>
+    <div class="px-5 py-3.5">
+      <div class="flex items-center gap-4 flex-wrap">
+        <div class="w-9 h-9 rounded-full bg-amber-200 flex items-center justify-center font-bold text-amber-800 text-sm flex-shrink-0">${(p.name||'-').charAt(0).toUpperCase()}</div>
+        <div class="flex-1 min-w-[180px]">
+          <p class="text-sm font-bold text-slate-800">${(p.name||'-').toUpperCase()}</p>
+          <p class="text-xs text-slate-500">${p.emel}${p.jawatan ? ' &bull; ' + p.jawatan : ''}${p.tel ? ' &bull; ' + p.tel : ''}</p>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <button onclick="prosesKelulusan('${p.id}','TOLAK')" class="px-3.5 py-2 text-xs font-bold text-red-600 bg-white hover:bg-red-50 border border-red-200 rounded-xl transition-colors flex items-center gap-1.5">
+            <i class="fas fa-times"></i> Tolak
+          </button>
+          <button onclick="prosesKelulusan('${p.id}','LULUS')" class="px-3.5 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl transition-colors flex items-center gap-1.5 shadow-sm shadow-green-200">
+            <i class="fas fa-check"></i> Luluskan
+          </button>
+        </div>
       </div>
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <button onclick="prosesKelulusan('${p.id}','TOLAK')" class="px-3.5 py-2 text-xs font-bold text-red-600 bg-white hover:bg-red-50 border border-red-200 rounded-xl transition-colors flex items-center gap-1.5">
-          <i class="fas fa-times"></i> Tolak
-        </button>
-        <button onclick="prosesKelulusan('${p.id}','LULUS')" class="px-3.5 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl transition-colors flex items-center gap-1.5 shadow-sm shadow-green-200">
-          <i class="fas fa-check"></i> Luluskan
-        </button>
-      </div>
+      ${p.amaranNamaSerupa ? `
+      <div class="mt-2.5 ml-13 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
+        <i class="fas fa-triangle-exclamation text-amber-500 text-xs mt-0.5"></i>
+        <p class="text-[11px] text-amber-700 font-medium">${p.amaranNamaSerupa} &mdash; sila sahkan ini bukan pendaftaran pendua sebelum diluluskan.</p>
+      </div>` : ''}
     </div>`).join(''));
 }
 

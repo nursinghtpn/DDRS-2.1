@@ -288,7 +288,7 @@
         </div>
       </div>
       <div>
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jawatan <span class="text-slate-400 font-normal normal-case">(pilihan)</span></label>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jawatan <span class="text-red-500">*</span></label>
         <div class="relative">
           <i class="fas fa-id-badge absolute left-3.5 top-1/2 -translate-y-1/2 text-teal-400 text-sm pointer-events-none"></i>
           <select id="daftarJawatan"
@@ -299,7 +299,7 @@
         </div>
       </div>
       <div>
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unit / Wad <span class="text-slate-400 font-normal normal-case">(pilihan)</span></label>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unit / Wad <span class="text-red-500">*</span></label>
         <div class="relative">
           <i class="fas fa-hospital-user absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400 text-sm pointer-events-none"></i>
           <select id="daftarUnit"
@@ -310,12 +310,13 @@
         </div>
       </div>
       <div>
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">No. Telefon <span class="text-slate-400 font-normal normal-case">(pilihan)</span></label>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">No. Telefon <span class="text-red-500">*</span></label>
         <div class="relative">
           <i class="fas fa-phone absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-          <input type="tel" id="daftarTel" placeholder="01X-XXXXXXX"
+          <input type="tel" id="daftarTel" placeholder="01X-XXXXXXXX" oninput="_formatNoTelefon(this)"
             class="w-full pl-10 pr-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none transition-colors">
         </div>
+        <p class="text-[11px] text-slate-400 mt-1">Format: 01X-XXXXXXXX (cth: 012-3456789)</p>
       </div>
       <div>
         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Emel <span class="text-red-500">*</span></label>
@@ -3056,6 +3057,12 @@ function submitDaftar(e) {
   const confirm  = document.getElementById('daftarPasswordConfirm').value;
 
   if (!nama)     return toast('error', 'Tidak Lengkap', 'Sila isi nama penuh.');
+  if (!jawatan)  return toast('error', 'Tidak Lengkap', 'Sila pilih jawatan.');
+  if (!unit)     return toast('error', 'Tidak Lengkap', 'Sila pilih Unit / Wad.');
+  if (!tel)      return toast('error', 'Tidak Lengkap', 'Sila isi nombor telefon.');
+  if (!/^01[0-9]-\d{7,8}$/.test(tel)) {
+    return toast('error', 'Format Salah', 'Nombor telefon mesti dalam format 01X-XXXXXXXX (cth: 012-3456789).');
+  }
   if (!emel)     return toast('error', 'Tidak Lengkap', 'Sila isi alamat emel.');
   if (!password) return toast('error', 'Tidak Lengkap', 'Sila isi kata laluan.');
   if (password.length < 6) return toast('error', 'Terlalu Pendek', 'Kata laluan mesti sekurang-kurangnya 6 aksara.');
@@ -7062,6 +7069,14 @@ function _autoUpper(el) {
     // Kembalikan kursor ke kedudukan asal (bukan hujung teks)
     el.setSelectionRange(start, end);
   }
+}
+
+// Auto-format nombor telefon semasa menaip: 01X-XXXXXXXX
+function _formatNoTelefon(el) {
+  const digitSahaja = el.value.replace(/\D/g, '').slice(0, 11); // maksimum 11 digit (01X + 8 digit)
+  el.value = digitSahaja.length > 3
+    ? digitSahaja.slice(0, 3) + '-' + digitSahaja.slice(3)
+    : digitSahaja;
 }
 
 function _autoTitleCase(el) {

@@ -1019,13 +1019,14 @@
                   </div>
                 </div>
                 <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Perihal Dokumen <span class="text-red-500">*</span></label>
-                  <div class="relative">
-                    <i class="fas fa-file-alt absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
-                    <textarea id="sdPerihal" rows="3" placeholder="NYATAKAN PERIHAL DOKUMEN YANG DISERAHKAN..."
-                      oninput="_autoUpper(this)"
-                      class="w-full pl-10 pr-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:border-teal-500 focus:outline-none transition-colors resize-none uppercase"></textarea>
+                  <div class="flex items-center justify-between mb-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Nama Penuh <span class="text-red-500">*</span></label>
+                    <button type="button" onclick="tambahBarisNamaSD()" class="text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1">
+                      <i class="fas fa-plus-circle"></i> Tambah Nama
+                    </button>
                   </div>
+                  <div id="sdNamaSenarai" class="space-y-2"></div>
+                  <p class="text-[11px] text-slate-400 mt-1.5">Tambah lebih daripada satu nama jika serahan ini melibatkan beberapa kakitangan.</p>
                 </div>
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan <span class="text-slate-400 font-normal normal-case">(pilihan)</span></label>
@@ -2069,6 +2070,48 @@
       </button>
       <button onclick="submitSemakanHantarUSM()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-indigo-100 text-sm flex items-center justify-center gap-2">
         <i class="fas fa-share"></i> Simpan Semakan & Hantar ke Unit Sumber Manusia
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: PINDAH SEMAKAN KE PENYEMAK LAIN ═══════════ -->
+<div id="modalPindahSemakan" class="hidden fixed inset-0 z-[60] modal-bg flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-600 to-slate-700 px-6 py-4 flex items-center justify-between">
+      <h3 class="font-bold text-white flex items-center gap-2"><i class="fas fa-people-arrows text-slate-300"></i> Pindah Semakan Dokumen</h3>
+      <button onclick="closeModal('modalPindahSemakan')" class="text-slate-300 hover:text-white transition"><i class="fas fa-times text-xl"></i></button>
+    </div>
+    <div class="p-5 space-y-4">
+      <input type="hidden" id="pindahDocId">
+
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Dokumen</p>
+        <p id="pindahDocInfo" class="text-sm font-bold text-slate-800"></p>
+        <p class="text-xs text-slate-500 mt-1">Sedang dikendalikan oleh: <b id="pindahPenyemakLama"></b></p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pindah Kepada <span class="text-red-500">*</span></label>
+        <div class="relative">
+          <i class="fas fa-user-check absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+          <select id="pindahPenyemakBaharu" class="w-full pl-10 pr-8 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium focus:border-slate-500 focus:outline-none transition-colors appearance-none bg-white">
+            <option value="" disabled selected>— Pilih Penyemak —</option>
+          </select>
+          <i class="fas fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan / Sebab Pindah <span class="text-slate-400 font-normal normal-case">(pilihan)</span></label>
+        <textarea id="pindahCatatan" rows="2" placeholder="Cth: Cuti kecemasan, beban kerja, dsb."
+          class="w-full border-2 border-slate-200 rounded-xl p-3 focus:border-slate-500 focus:outline-none transition-colors text-sm resize-none"></textarea>
+      </div>
+    </div>
+    <div class="flex gap-3 p-5 pt-0">
+      <button onclick="closeModal('modalPindahSemakan')" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition-colors">Batal</button>
+      <button onclick="simpanPindahSemakan()" class="flex-1 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+        <i class="fas fa-people-arrows"></i> Pindahkan
       </button>
     </div>
   </div>
@@ -3656,6 +3699,53 @@ function _dapatkanSenaraiNamaEdit() {
     .filter(v => v);
 }
 
+// ── Set fungsi BERASINGAN khusus untuk Borang Serahan Dalaman ──
+let _sdNamaBarisId = 0;
+
+function _sdBarisNamaHTML(idBaris, nilai) {
+  return `
+  <div class="flex items-center gap-2" data-sd-baris-nama="${idBaris}">
+    <div class="relative flex-1">
+      <i class="fas fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+      <input type="text" value="${nilai || ''}" placeholder="NAMA PENUH..." oninput="_autoUpper(this)"
+        class="sd-nama-input w-full pl-9 pr-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium uppercase focus:border-teal-500 focus:outline-none transition-colors">
+    </div>
+    <button type="button" onclick="buangBarisNamaSD(${idBaris})"
+      class="sd-nama-buang flex-shrink-0 w-9 h-9 rounded-xl bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors">
+      <i class="fas fa-times text-sm"></i>
+    </button>
+  </div>`;
+}
+
+function tambahBarisNamaSD(nilai) {
+  const container = document.getElementById('sdNamaSenarai');
+  if (!container) return;
+  _sdNamaBarisId++;
+  container.insertAdjacentHTML('beforeend', _sdBarisNamaHTML(_sdNamaBarisId, nilai));
+  _kemaskiniButangBuangNamaSD();
+}
+
+function buangBarisNamaSD(idBaris) {
+  const container = document.getElementById('sdNamaSenarai');
+  const baris = container?.querySelector(`[data-sd-baris-nama="${idBaris}"]`);
+  if (baris) baris.remove();
+  if (container && container.children.length === 0) tambahBarisNamaSD();
+  _kemaskiniButangBuangNamaSD();
+}
+
+function _kemaskiniButangBuangNamaSD() {
+  const container = document.getElementById('sdNamaSenarai');
+  if (!container) return;
+  const bilangan = container.children.length;
+  container.querySelectorAll('.sd-nama-buang').forEach(btn => btn.classList.toggle('hidden', bilangan <= 1));
+}
+
+function _dapatkanSenaraiNamaSD() {
+  return [...document.querySelectorAll('#sdNamaSenarai .sd-nama-input')]
+    .map(el => el.value.trim().toUpperCase())
+    .filter(v => v);
+}
+
 function _formatSenaraiNama(arr) {
   if (!arr || arr.length === 0) return '-';
   if (arr.length === 1) return arr[0];
@@ -3993,6 +4083,7 @@ function bukaDetailStatus(docId) {
     PENYEMAK_SELESAI: { bg:'bg-green-50',  border:'border-green-200',  icon:'fa-check-double',       ic:'text-green-600',  label:'Selesai' },
     PENGHANTAR_KEMASKINI: { bg:'bg-blue-50', border:'border-blue-200', icon:'fa-pen',              ic:'text-blue-500',   label:'Dikemaskini oleh Penghantar' },
     PENGHANTAR_PADAM:     { bg:'bg-red-50',  border:'border-red-200',  icon:'fa-trash-alt',        ic:'text-red-500',    label:'Dipadam oleh Penghantar' },
+    PENYEMAK_PINDAH:      { bg:'bg-slate-50', border:'border-slate-300', icon:'fa-people-arrows',   ic:'text-slate-500',  label:'Dipindahkan Penyemak' },
   };
 
   const _cleanCatatan = (tindakan, catatan) => {
@@ -4416,9 +4507,13 @@ function filterSemakan(f) {
 }
 
 function renderSemakan() {
-  // Dokumen yang sudah diterima (Disemak) ATAU ditolak — milik penyemak ini atau semua (untuk admin)
-  // Juga papar dokumen "Dihantar ke USM" supaya penyemak boleh cetak slip
+  // Dokumen yang sudah diterima (Disemak) ATAU ditolak — HANYA milik Penyemak yang
+  // memproses dari Inbox (namaPenyemak === currentUser.name). Admin kekal nampak SEMUA
+  // (keperluan pengawasan). Juga papar dokumen "Dihantar ke USM" supaya boleh cetak slip.
   let items = db.filter(d => ['Disemak','Ditolak','Dihantar ke USM'].includes(d.status));
+  if (currentUser.role !== 'admin') {
+    items = items.filter(d => d.namaPenyemak === currentUser.name);
+  }
   if (_semakanFilter !== 'semua') {
     items = items.filter(d => d.status === _semakanFilter);
   }
@@ -4481,6 +4576,10 @@ function renderSemakan() {
               class="px-5 py-2 bg-white hover:bg-green-50 border-2 border-green-300 text-green-700 font-bold rounded-xl text-xs transition-all flex items-center gap-2 whitespace-nowrap">
               <i class="fas fa-check-double"></i> Selesai (Tiada USM)
             </button>
+            <button onclick="bukaModalPindahSemakan('${d.id}')"
+              class="px-5 py-2 bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-600 font-bold rounded-xl text-xs transition-all flex items-center gap-2 whitespace-nowrap">
+              <i class="fas fa-people-arrows"></i> Pindah ke Penyemak Lain
+            </button>
             <p class="text-[10px] text-slate-400 text-center font-medium">Pilih ikut keperluan dokumen</p>
           ` : isKeUSM ? `
             <button onclick="cetakSlipPenghantaran('${d.id}')"
@@ -4492,6 +4591,10 @@ function renderSemakan() {
             <div class="px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-600 flex items-center gap-2">
               <i class="fas fa-times-circle"></i> Dokumen Ditolak
             </div>
+            <button onclick="bukaModalPindahSemakan('${d.id}')"
+              class="px-5 py-2 bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-600 font-bold rounded-xl text-xs transition-all flex items-center gap-2 whitespace-nowrap">
+              <i class="fas fa-people-arrows"></i> Pindah ke Penyemak Lain
+            </button>
           `}
         </div>
       </div>
@@ -4502,6 +4605,61 @@ function renderSemakan() {
 // ─────────────────────────────────────────────
 // MODAL SEMAKAN + HANTAR USM
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// PINDAH SEMAKAN KE PENYEMAK LAIN
+// ─────────────────────────────────────────────
+function bukaModalPindahSemakan(docId) {
+  const d = db.find(x => x.id === docId);
+  if (!d) return toast('error', 'Ralat', 'Dokumen tidak dijumpai.');
+
+  document.getElementById('pindahDocId').value = docId;
+  document.getElementById('pindahDocInfo').textContent = `${d.id} — ${d.namaDokumen}`;
+  document.getElementById('pindahPenyemakLama').textContent = d.namaPenyemak || '—';
+  document.getElementById('pindahCatatan').value = '';
+
+  // Senarai semua Penyemak LAIN (bukan diri sendiri, bukan yang sedang mengendali dokumen ini)
+  const senaraiPenyemak = (usersData || []).filter(u =>
+    (u.role === 'penyemak' || u.role === 'admin') &&
+    u.name !== currentUser.name &&
+    u.name !== d.namaPenyemak
+  );
+  const sel = document.getElementById('pindahPenyemakBaharu');
+  if (senaraiPenyemak.length === 0) {
+    setHTML(sel, `<option value="" disabled selected>Tiada Penyemak lain tersedia</option>`);
+  } else {
+    setHTML(sel, `<option value="" disabled selected>— Pilih Penyemak —</option>` +
+      senaraiPenyemak.map(u => `<option value="${u.id}" data-nama="${u.name}">${u.name}</option>`).join(''));
+  }
+
+  document.getElementById('modalPindahSemakan').classList.remove('hidden');
+}
+
+function simpanPindahSemakan() {
+  const docId = document.getElementById('pindahDocId').value;
+  const selEl = document.getElementById('pindahPenyemakBaharu');
+  const idPenyemakBaharu = selEl.value;
+  if (!idPenyemakBaharu) return toast('error', 'Tidak Lengkap', 'Sila pilih Penyemak untuk terima pindahan.');
+  const namaPenyemakBaharu = selEl.options[selEl.selectedIndex]?.getAttribute('data-nama') || '';
+  const catatan = document.getElementById('pindahCatatan').value.trim() || '-';
+
+  const d = db.find(x => x.id === docId);
+  if (!d) return;
+  const namaPenyemakLama = d.namaPenyemak || '—';
+  const now = _fmtTarikhMasa(new Date());
+
+  _optimistic(
+    () => {
+      d.namaPenyemak = namaPenyemakBaharu;
+      logData.unshift({logId:'LOG'+Date.now(), idDokumen:docId, namaDokumen:d.namaDokumen, pengguna:currentUser.name, peranan:'penyemak', tindakan:'PENYEMAK_PINDAH', catatan:`Dipindahkan daripada ${namaPenyemakLama} kepada ${namaPenyemakBaharu}${catatan !== '-' ? ' | Sebab: ' + catatan : ''}`, tarikhMasa:now});
+      renderSemakan();
+    },
+    'pindahSemakanDokumen', [docId, idPenyemakBaharu, namaPenyemakBaharu, namaPenyemakLama, currentUser.name, catatan],
+    `Dokumen dipindahkan kepada ${namaPenyemakBaharu}.`,
+    'Dipindahkan'
+  );
+  closeModal('modalPindahSemakan');
+}
+
 async function tandaSelesaiTanpaUSM(docId) {
   const d = db.find(x => x.id === docId);
   if (!d) return;
@@ -4876,6 +5034,7 @@ function bukaDetailRekod(docId) {
     PENYEMAK_SELESAI: { bg:'bg-green-50',  border:'border-green-200',  icon:'fa-check-double',       ic:'text-green-600',  label:'Selesai' },
     PENGHANTAR_KEMASKINI: { bg:'bg-blue-50', border:'border-blue-200', icon:'fa-pen',              ic:'text-blue-500',   label:'Dikemaskini oleh Penghantar' },
     PENGHANTAR_PADAM:     { bg:'bg-red-50',  border:'border-red-200',  icon:'fa-trash-alt',        ic:'text-red-500',    label:'Dipadam oleh Penghantar' },
+    PENYEMAK_PINDAH:      { bg:'bg-slate-50', border:'border-slate-300', icon:'fa-people-arrows',   ic:'text-slate-500',  label:'Dipindahkan Penyemak' },
   };
 
   const _row = (label, value, extra='') => value && value !== '-'
@@ -5982,6 +6141,10 @@ function renderSerahanDalaman() {
   const sdPenghantar = document.getElementById('sdPenghantar');
   if (sdPenghantar) sdPenghantar.value = currentUser.name;
 
+  // Pastikan senarai nama ada sekurang-kurangnya satu baris kosong
+  const sdNamaContainer = document.getElementById('sdNamaSenarai');
+  if (sdNamaContainer && sdNamaContainer.children.length === 0) tambahBarisNamaSD();
+
   const sdPenerima = document.getElementById('sdPenerima');
   if (sdPenerima) {
     const targetRole = currentUser.role === 'penyemak' ? 'usm' : 'penyemak';
@@ -6687,8 +6850,9 @@ function hantarSerahanDalaman() {
   const selEl    = document.getElementById('sdPenerima');
   const kepadaId = selEl?.value;
   if (!kepadaId) return toast('error','Tidak Lengkap','Sila pilih penerima.');
-  const perihal = document.getElementById('sdPerihal')?.value.trim();
-  if (!perihal)  return toast('error','Tidak Lengkap','Sila isi perihal dokumen.');
+  const namaSenarai = _dapatkanSenaraiNamaSD();
+  if (namaSenarai.length === 0) return toast('error','Tidak Lengkap','Sila isi sekurang-kurangnya satu nama penuh.');
+  const perihal = _formatSenaraiNama(namaSenarai);
   const kepadaNama    = selEl.options[selEl.selectedIndex]?.getAttribute('data-nama') || '';
   const kepadaPeranan = selEl.options[selEl.selectedIndex]?.getAttribute('data-peranan') || '';
   const catatan = document.getElementById('sdCatatan')?.value.trim() || '-';
@@ -6699,11 +6863,13 @@ function hantarSerahanDalaman() {
     jenis = jenisLain;
   }
   const now     = _fmtTarikhMasa(new Date());
-  const data = { id:'SD'+Date.now().toString().slice(-7)+Math.floor(Math.random()*900+100), daripadaId:currentUser.id, daripadaNama:currentUser.name, daripadaPeranan:currentUser.role, kepadaId, kepadaNama, kepadaPeranan, perihal, catatan, jenisDokumen:jenis, chat:[], status:'Baharu', tarikhHantar:now, tarikhBaca:'-', tarikhSahkan:'-', tarikhKemaskini:now };
+  const data = { id:'SD'+Date.now().toString().slice(-7)+Math.floor(Math.random()*900+100), daripadaId:currentUser.id, daripadaNama:currentUser.name, daripadaPeranan:currentUser.role, kepadaId, kepadaNama, kepadaPeranan, perihal, namaSenarai, catatan, jenisDokumen:jenis, chat:[], status:'Baharu', tarikhHantar:now, tarikhBaca:'-', tarikhSahkan:'-', tarikhKemaskini:now };
   serahanDalamanData.unshift(data);
   _renderSDDashboard(); _updateBadgeSD(); _renderListSD(); _renderSDLog();
   toast('success','Serahan Dihantar',`Dokumen telah dihantar kepada ${kepadaNama}.`);
-  ['sdPerihal','sdCatatan'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const containerNamaSD = document.getElementById('sdNamaSenarai');
+  if (containerNamaSD) { containerNamaSD.innerHTML = ''; tambahBarisNamaSD(); }
+  document.getElementById('sdCatatan').value = '';
   const selJenis = document.getElementById('sdJenisDokumen'); if(selJenis) selJenis.value='';
   const selJenisCari = document.getElementById('sdJenisDokumenCari'); if(selJenisCari) selJenisCari.value='';
   _toggleJenisDokumenLainSD();

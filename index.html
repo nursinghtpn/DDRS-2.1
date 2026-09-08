@@ -934,6 +934,28 @@
             </button>
           </div>
         </div>
+
+        <!-- Filter Lanjutan: Tarikh & Nama -->
+        <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-2 flex-wrap mb-4">
+          <div class="relative flex-1 min-w-[180px]">
+            <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+            <input type="text" id="semakanCariNama" placeholder="Cari nama dokumen/penghantar/penerima..." oninput="renderSemakan()" autocomplete="off"
+              class="w-full pl-9 pr-3 py-2 border-2 border-slate-200 rounded-lg text-xs font-medium focus:border-purple-500 focus:outline-none transition-colors">
+          </div>
+          <div class="flex items-center gap-1.5">
+            <i class="far fa-calendar text-slate-400 text-xs"></i>
+            <input type="date" id="semakanTarikhDari" onchange="renderSemakan()"
+              class="px-2.5 py-2 border-2 border-slate-200 rounded-lg text-xs font-medium focus:border-purple-500 focus:outline-none transition-colors">
+            <span class="text-xs text-slate-400 font-semibold">hingga</span>
+            <input type="date" id="semakanTarikhHingga" onchange="renderSemakan()"
+              class="px-2.5 py-2 border-2 border-slate-200 rounded-lg text-xs font-medium focus:border-purple-500 focus:outline-none transition-colors">
+          </div>
+          <button onclick="_resetFilterLanjutanSemakan()"
+            class="px-3 py-2 text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1.5">
+            <i class="fas fa-times-circle text-xs"></i> Reset
+          </button>
+        </div>
+
         <div id="listSemakan" class="space-y-4"></div>
       </div>
 
@@ -4518,6 +4540,28 @@ function renderSemakan() {
     items = items.filter(d => d.status === _semakanFilter);
   }
 
+  // ── Carian nama (dokumen/penghantar/penerima USM) ──
+  const cariNama = (document.getElementById('semakanCariNama')?.value || '').trim().toLowerCase();
+  if (cariNama) {
+    items = items.filter(d =>
+      (d.namaDokumen || '').toLowerCase().includes(cariNama) ||
+      (d.namaPenghantar || '').toLowerCase().includes(cariNama) ||
+      (d.namaPenerimaUSM || '').toLowerCase().includes(cariNama));
+  }
+
+  // ── Julat tarikh (ikut Tarikh Hantar) ──
+  const tarikhDari   = document.getElementById('semakanTarikhDari')?.value || '';
+  const tarikhHingga = document.getElementById('semakanTarikhHingga')?.value || '';
+  if (tarikhDari || tarikhHingga) {
+    items = items.filter(d => {
+      const iso = _parseTarikhDDMMYYYY(d.tarikhSerahan);
+      if (!iso) return true; // tarikh tidak dapat diparse — jangan sembunyikan (selamat)
+      if (tarikhDari && iso < tarikhDari) return false;
+      if (tarikhHingga && iso > tarikhHingga) return false;
+      return true;
+    });
+  }
+
   const container = document.getElementById('listSemakan');
   if (!container) return;
 
@@ -6538,6 +6582,16 @@ function _resetFilterLanjutanSD() {
   if (dari)   dari.value = '';
   if (hingga) hingga.value = '';
   _renderListSD();
+}
+
+function _resetFilterLanjutanSemakan() {
+  const cari = document.getElementById('semakanCariNama');
+  const dari = document.getElementById('semakanTarikhDari');
+  const hingga = document.getElementById('semakanTarikhHingga');
+  if (cari)   cari.value = '';
+  if (dari)   dari.value = '';
+  if (hingga) hingga.value = '';
+  renderSemakan();
 }
 
 // ─────────────────────────────────────────────

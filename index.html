@@ -5454,7 +5454,7 @@ function _slipCSS() {
   `;
 }
 
-function _slipHeaderHTML(tarikhCetak, rujukan) {
+function _slipHeaderHTML(tarikhCetak, rujukan, tajuk) {
   return `
   <div class="slip-header">
     <div class="org">
@@ -5462,7 +5462,7 @@ function _slipHeaderHTML(tarikhCetak, rujukan) {
       Unit Kejururawatan – Sistem Pengurusan Dokumen (DDRS 2.0)
     </div>
     <div class="judul">
-      <h2>Slip Penghantaran</h2>
+      <h2>${tajuk || 'Slip Penghantaran'}</h2>
       <div class="tkhcetak">Dicetak: ${tarikhCetak}${rujukan ? ' &nbsp;|&nbsp; Ruj: <b>'+rujukan+'</b>' : ''}</div>
     </div>
   </div>`;
@@ -6646,16 +6646,7 @@ function cetakSlipDespatch(id) {
   const html = '<!DOCTYPE html><html lang="ms"><head><meta charset="UTF-8"><title>Slip Despatch - ' + d.id + '</title>' +
 '<style>' + _slipCSS() + '</style></head><body>' +
   '<div class="page-wrap">' +
-    '<div class="slip-header">' +
-      '<div class="org">' +
-        '<b>Hospital Tengku Permaisuri Norashikin</b>' +
-        'Unit Kejururawatan \u2013 Sistem Pengurusan Dokumen (DDRS 2.0)' +
-      '</div>' +
-      '<div class="judul">' +
-        '<h2>Slip Despatch</h2>' +
-        '<div class="tkhcetak">Dicetak: ' + tarikhCetak + ' &nbsp;|&nbsp; Ruj: <b>' + d.id + '</b></div>' +
-      '</div>' +
-    '</div>' +
+    _slipHeaderHTML(tarikhCetak, d.id, 'Slip Despatch') +
     '<table class="dok">' +
       '<thead><tr>' +
         '<td class="no">Bil.</td>' +
@@ -7199,75 +7190,76 @@ function cetakSlipSDTerpilih() {
 function _cetakSlipSDHtml(senarai) {
   const tarikhCetak = _fmtTarikhMasa(new Date());
 
-  const rows = senarai.map((s, i) => `
-    <tr>
-      <td class="no">${i+1}</td>
-      <td>
-        ${s.jenisDokumen && s.jenisDokumen !== '-' ? `<div class="jenis">${s.jenisDokumen}</div>` : ''}
-        <div class="nama">${s.perihal}</div>
-      </td>
-      <td class="sub">${s.daripadaNama}</td>
-      <td class="sub">${s.kepadaNama}</td>
-      <td class="sub">${_tarikhSahaja(s.tarikhHantar)}</td>
-      <td class="sub text-center">${s.status==='Disahkan'?'<span style="color:#16a34a;font-weight:700">✓ Disahkan</span>':'<span style="color:#d97706">Menunggu</span>'}</td>
-    </tr>`).join('');
+  // ── Kumpulkan ikut PENERIMA (Kepada) — setiap penerima dapat bahagian sendiri
+  // dengan ruang tandatangan khusus, memudahkan mereka cam & tandatangan bahagian sendiri ──
+  const kumpulan = {};
+  senarai.forEach(s => {
+    const kunci = s.kepadaId || s.kepadaNama;
+    if (!kumpulan[kunci]) kumpulan[kunci] = { kepadaNama: s.kepadaNama, kepadaPeranan: s.kepadaPeranan, items: [] };
+    kumpulan[kunci].items.push(s);
+  });
+
+  const bahagianHTML = Object.values(kumpulan).map(kump => {
+    const rows = kump.items.map((s, i) => `
+      <tr>
+        <td class="no">${i + 1}</td>
+        <td>
+          ${s.jenisDokumen && s.jenisDokumen !== '-' ? `<div class="jenis">${s.jenisDokumen}</div>` : ''}
+          <div class="nama">${s.perihal}</div>
+        </td>
+        <td class="sub">${s.daripadaNama}</td>
+        <td class="sub">${_tarikhSahaja(s.tarikhHantar)}</td>
+      </tr>`).join('');
+
+    const labelPeranan = kump.kepadaPeranan === 'usm' ? 'Pegawai Unit Sumber Manusia' : 'Pegawai Unit Kejururawatan';
+
+    return `
+    <div class="kumpulan-penerima">
+      <div class="kumpulan-tajuk">Kepada: <b>${kump.kepadaNama}</b> <span class="bil-dok">(${kump.items.length} dokumen)</span></div>
+      <table class="dok">
+        <thead><tr>
+          <td class="no">Bil.</td>
+          <td style="width:50%">Perihal / Jenis Dokumen</td>
+          <td>Daripada</td>
+          <td>Tarikh</td>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="ttd-section">
+        <div class="ttd-title">Tandatangan Pengesahan</div>
+        <div class="ttd-grid">
+          <div class="ttd-box">
+            <div class="tlbl">Dihantar Oleh</div>
+            <div class="trole">Pegawai Unit Kejururawatan</div>
+            <div class="tline">
+              <div class="tnama">${currentUser.name || ''}</div>
+              <div class="ttarikh">Tarikh: ${_fmtTarikh(new Date())}</div>
+            </div>
+          </div>
+          <div class="ttd-box">
+            <div class="tlbl">Diterima Oleh</div>
+            <div class="trole">${labelPeranan}</div>
+            <div class="tline">
+              <div class="tnama">${kump.kepadaNama}</div>
+              <div class="ttarikh">Tarikh: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('<div class="pemisah-kumpulan"></div>');
 
   const html = `<!DOCTYPE html><html lang="ms"><head><meta charset="UTF-8"><title>Slip Serahan Dalaman</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{font-family:Arial,sans-serif;font-size:10pt;color:#111;}
-  .page-wrap{padding:14mm;}
-  .slip-header{display:flex;align-items:center;justify-content:space-between;border-bottom:2.5px solid #0f766e;padding-bottom:8px;margin-bottom:12px;}
-  .slip-header .org b{font-size:11.5pt;font-weight:900;color:#0f766e;text-transform:uppercase;display:block;}
-  .slip-header .org span{font-size:8pt;color:#555;}
-  .slip-header .judul{text-align:right;}
-  .slip-header .judul h2{font-size:13pt;font-weight:900;color:#0f766e;text-transform:uppercase;letter-spacing:1px;}
-  .slip-header .judul .ref{font-size:7.5pt;color:#777;margin-top:3px;}
-  table.dok{width:100%;border-collapse:collapse;font-size:9.5pt;margin-bottom:14px;}
-  table.dok thead tr{background:#0f766e;color:#fff;}
-  table.dok thead td{padding:5px 7px;font-weight:700;font-size:8.5pt;}
-  table.dok tbody tr{border-bottom:1px solid #e2e8f0;}
-  table.dok tbody tr:nth-child(even){background:#f0fdfa;}
-  table.dok tbody td{padding:5px 7px;vertical-align:top;}
-  td.no{width:28px;text-align:center;color:#64748b;}
-  .nama{font-weight:700;line-height:1.35;white-space:pre-wrap;}
-  .jenis{font-size:8pt;font-weight:700;color:#4f46e5;margin-bottom:2px;}
-  .sub{font-size:9pt;}
-  .ttd-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;}
-  .ttd{border:1.5px solid #cbd5e1;border-radius:5px;padding:8px 11px 10px;}
-  .ttd .tlbl{font-size:8pt;font-weight:700;color:#0f766e;text-transform:uppercase;margin-bottom:1px;}
-  .ttd .trole{font-size:8pt;color:#666;margin-bottom:32px;}
-  .ttd .tline{border-top:1.5px solid #0f766e;padding-top:4px;display:flex;justify-content:space-between;}
-  .ttd .tnama{font-size:10pt;font-weight:700;}
-  .ttd .ttarikh{font-size:8pt;color:#555;}
-  .nota{margin-top:10px;padding:5px 9px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:4px;font-size:8pt;color:#134e4a;}
-  .ft{margin-top:9px;border-top:1px solid #e2e8f0;padding-top:4px;display:flex;justify-content:space-between;font-size:7.5pt;color:#94a3b8;}
-  @media print{@page{size:A4 portrait;margin:0;}.page-wrap{padding:12mm 14mm;}body{margin:0;}}
+<style>${_slipCSS()}
+  .kumpulan-tajuk{font-size:9.5pt;font-weight:700;color:#1e3a5f;background:#eef2ff;padding:5px 9px;border-left:3px solid #1e3a5f;margin-bottom:8px;}
+  .kumpulan-tajuk .bil-dok{font-weight:400;color:#64748b;font-size:8.5pt;}
+  .pemisah-kumpulan{border-top:1.5px dashed #cbd5e1;margin:16px 0;}
 </style></head><body>
 <div class="page-wrap">
-  <div class="slip-header">
-    <div class="org">
-      <b>Hospital Tengku Permaisuri Norashikin</b>
-      <span>Unit Kejururawatan – Sistem Pengurusan Dokumen (DDRS 2.0)</span>
-    </div>
-    <div class="judul">
-      <h2>Slip Serahan Dalaman</h2>
-      <div class="ref">Dicetak: ${tarikhCetak} &nbsp;|&nbsp; Jumlah: ${senarai.length} rekod</div>
-    </div>
-  </div>
-  <table class="dok">
-    <thead><tr>
-      <td class="no">Bil.</td>
-      <td style="width:38%">Perihal / Jenis Dokumen</td>
-      <td>Daripada</td>
-      <td>Kepada</td>
-      <td>Tarikh</td>
-      <td>Status</td>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  ${_slipTTDHTML(currentUser.name,'',_fmtTarikh(new Date()))}
-  <div class="nota"><b>NOTA:</b> Slip ini adalah rekod serahan dokumen dalaman antara Unit Kejururawatan dan Unit Sumber Manusia.</div>
+  ${_slipHeaderHTML(tarikhCetak, null, 'Slip Serahan Dalaman')}
+  <div style="font-size:7.5pt;color:#777;margin:-6px 0 12px;">Jumlah: ${senarai.length} rekod &bull; ${Object.keys(kumpulan).length} penerima</div>
+  ${bahagianHTML}
+  <div class="nota"><b>NOTA:</b> Slip ini adalah rekod serahan dokumen dalaman antara Unit Kejururawatan dan Unit Sumber Manusia. Setiap penerima disusun berasingan untuk memudahkan pengesahan tandatangan.</div>
   <div class="ft"><span>DDRS 2.0 – Unit Kejururawatan, HTPN</span><span>Dicetak: ${tarikhCetak}</span></div>
 </div>
 <script>window.onload=()=>{window.print();};<\/script></body></html>`;

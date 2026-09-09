@@ -3220,6 +3220,8 @@ function handleLogout() {
   currentUser = null;
   clearInterval(syncTimer);
   db = []; logData = []; usersData = [];
+  _jumlahNotifSebelum = 0;
+  _notifPertamaKaliDimuat = true;
   document.getElementById('appView').classList.add('hidden');
   document.getElementById('loginView').classList.remove('hidden');
 }
@@ -6839,11 +6841,55 @@ function _senaraiChatBelumBacaSD() {
     .filter(x => x.belum > 0 && x.mesejTerakhir && x.mesejTerakhir.userId !== currentUser.id);
 }
 
+// ─────────────────────────────────────────────
+// BUNYI NOTIFIKASI — dimainkan bila lencana loceng BERTAMBAH (mesej/perbualan baharu)
+// ─────────────────────────────────────────────
+let _notifAudioCtx = null;
+function _mainkanBunyiNotifikasi() {
+  try {
+    if (!_notifAudioCtx) _notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _notifAudioCtx;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const mainkanNada = (freq, mula, tempoh, gain) => {
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gainNode.gain.setValueAtTime(0, ctx.currentTime + mula);
+      gainNode.gain.linearRampToValueAtTime(gain, ctx.currentTime + mula + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + mula + tempoh);
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      osc.start(ctx.currentTime + mula);
+      osc.stop(ctx.currentTime + mula + tempoh + 0.05);
+    };
+
+    // Dua nada pendek & lembut (bunyi "ding" ringkas)
+    mainkanNada(880, 0, 0.15, 0.18);
+    mainkanNada(1320, 0.1, 0.2, 0.14);
+  } catch (e) {
+    // Langkau senyap jika pelayar sekat audio automatik
+  }
+}
+
+let _jumlahNotifSebelum = 0;
+let _notifPertamaKaliDimuat = true;
+
 function _updateNotifChatBadge() {
   const badge = document.getElementById('notifChatBadge');
   if (!badge) return;
   const senarai = _senaraiChatBelumBacaSD();
   const jumlah  = senarai.reduce((total, x) => total + x.belum, 0);
+
+  // Mainkan bunyi HANYA bila jumlah bertambah (mesej baharu tiba) — bukan pada
+  // pemuatan pertama (elak bunyi bila log masuk dengan notifikasi sedia ada)
+  if (!_notifPertamaKaliDimuat && jumlah > _jumlahNotifSebelum) {
+    _mainkanBunyiNotifikasi();
+  }
+  _notifPertamaKaliDimuat = false;
+  _jumlahNotifSebelum = jumlah;
+
   if (jumlah > 0) {
     badge.textContent = jumlah > 9 ? '9+' : jumlah;
     badge.classList.remove('hidden');
@@ -7081,7 +7127,7 @@ function _renderChatSD(s) {
       <div class="max-w-[75%]">
         ${!isMe?`<p class="text-[10px] text-slate-400 mb-0.5">${ch.nama}</p>`:''}
         <div class="${isMe?'bg-teal-600 text-white':'bg-slate-100 text-slate-800'} rounded-2xl ${isMe?'rounded-br-sm':'rounded-bl-sm'} px-3 py-2 text-xs">${ch.teks}</div>
-        <p class="text-[10px] text-slate-400 mt-0.5 ${isMe?'text-right':'text-left'}">${_tarikhSahaja(ch.masa)}</p>
+        <p class="text-[10px] text-slate-400 mt-0.5 ${isMe?'text-right':'text-left'}">${ch.masa}</p>
       </div>
     </div>`;
   }).join(''));

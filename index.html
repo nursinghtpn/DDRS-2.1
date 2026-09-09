@@ -7191,7 +7191,7 @@ function _cetakSlipSDHtml(senarai) {
   const tarikhCetak = _fmtTarikhMasa(new Date());
 
   // ── Kumpulkan ikut PENERIMA (Kepada) — setiap penerima dapat bahagian sendiri
-  // dengan ruang tandatangan khusus, memudahkan mereka cam & tandatangan bahagian sendiri ──
+  // dengan ruang tandatangan di SEBELAH jadual dokumen, memudahkan mereka cam & tandatangan ──
   const kumpulan = {};
   senarai.forEach(s => {
     const kunci = s.kepadaId || s.kepadaNama;
@@ -7207,7 +7207,6 @@ function _cetakSlipSDHtml(senarai) {
           ${s.jenisDokumen && s.jenisDokumen !== '-' ? `<div class="jenis">${s.jenisDokumen}</div>` : ''}
           <div class="nama">${s.perihal}</div>
         </td>
-        <td class="sub">${s.daripadaNama}</td>
         <td class="sub">${_tarikhSahaja(s.tarikhHantar)}</td>
       </tr>`).join('');
 
@@ -7216,33 +7215,21 @@ function _cetakSlipSDHtml(senarai) {
     return `
     <div class="kumpulan-penerima">
       <div class="kumpulan-tajuk">Kepada: <b>${kump.kepadaNama}</b> <span class="bil-dok">(${kump.items.length} dokumen)</span></div>
-      <table class="dok">
-        <thead><tr>
-          <td class="no">Bil.</td>
-          <td style="width:50%">Perihal / Jenis Dokumen</td>
-          <td>Daripada</td>
-          <td>Tarikh</td>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div class="ttd-section">
-        <div class="ttd-title">Tandatangan Pengesahan</div>
-        <div class="ttd-grid">
-          <div class="ttd-box">
-            <div class="tlbl">Dihantar Oleh</div>
-            <div class="trole">Pegawai Unit Kejururawatan</div>
-            <div class="tline">
-              <div class="tnama">${currentUser.name || ''}</div>
-              <div class="ttarikh">Tarikh: ${_fmtTarikh(new Date())}</div>
-            </div>
-          </div>
-          <div class="ttd-box">
-            <div class="tlbl">Diterima Oleh</div>
-            <div class="trole">${labelPeranan}</div>
-            <div class="tline">
-              <div class="tnama">${kump.kepadaNama}</div>
-              <div class="ttarikh">Tarikh: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
-            </div>
+      <div class="kumpulan-grid">
+        <table class="dok">
+          <thead><tr>
+            <td class="no">Bil.</td>
+            <td style="width:70%">Perihal / Jenis Dokumen</td>
+            <td>Tarikh</td>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="ttd-box ttd-box-samping">
+          <div class="tlbl">Diterima Oleh</div>
+          <div class="trole">${labelPeranan}</div>
+          <div class="tline">
+            <div class="tnama">${kump.kepadaNama}</div>
+            <div class="ttarikh">Tarikh:</div>
           </div>
         </div>
       </div>
@@ -7254,11 +7241,26 @@ function _cetakSlipSDHtml(senarai) {
   .kumpulan-tajuk{font-size:9.5pt;font-weight:700;color:#1e3a5f;background:#eef2ff;padding:5px 9px;border-left:3px solid #1e3a5f;margin-bottom:8px;}
   .kumpulan-tajuk .bil-dok{font-weight:400;color:#64748b;font-size:8.5pt;}
   .pemisah-kumpulan{border-top:1.5px dashed #cbd5e1;margin:16px 0;}
+  .kumpulan-grid{display:grid;grid-template-columns:1fr 190px;gap:12px;align-items:stretch;}
+  .kumpulan-grid table.dok{margin-bottom:0;}
+  .ttd-box-samping{display:flex;flex-direction:column;justify-content:flex-end;min-height:95px;}
+  .ttd-box-samping .trole{margin-bottom:auto;}
 </style></head><body>
 <div class="page-wrap">
   ${_slipHeaderHTML(tarikhCetak, null, 'Slip Serahan Dalaman')}
   <div style="font-size:7.5pt;color:#777;margin:-6px 0 12px;">Jumlah: ${senarai.length} rekod &bull; ${Object.keys(kumpulan).length} penerima</div>
   ${bahagianHTML}
+  <div class="ttd-section">
+    <div class="ttd-title">Tandatangan Penghantar</div>
+    <div class="ttd-box" style="max-width:260px;">
+      <div class="tlbl">Dihantar Oleh</div>
+      <div class="trole">Pegawai Unit Kejururawatan</div>
+      <div class="tline">
+        <div class="tnama">${currentUser.name || ''}</div>
+        <div class="ttarikh">Tarikh: ${_fmtTarikh(new Date())}</div>
+      </div>
+    </div>
+  </div>
   <div class="nota"><b>NOTA:</b> Slip ini adalah rekod serahan dokumen dalaman antara Unit Kejururawatan dan Unit Sumber Manusia. Setiap penerima disusun berasingan untuk memudahkan pengesahan tandatangan.</div>
   <div class="ft"><span>DDRS 2.0 – Unit Kejururawatan, HTPN</span><span>Dicetak: ${tarikhCetak}</span></div>
 </div>

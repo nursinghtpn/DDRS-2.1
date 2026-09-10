@@ -3449,7 +3449,10 @@ function renderTabContent(tabId) {
 
 function updateBadges() {
   const inboxCount   = db.filter(d => d.status === 'Dihantar').length;
-  const semakanCount = db.filter(d => d.status === 'Disemak').length;
+  let semakanCount   = db.filter(d => d.status === 'Disemak').length;
+  if (currentUser.role !== 'admin') {
+    semakanCount = db.filter(d => d.status === 'Disemak' && d.namaPenyemak === currentUser.name).length;
+  }
   const usmCount     = db.filter(d =>
     d.status === 'Dihantar ke USM' &&
     (currentUser.role === 'admin' || d.idPenerimaUSM === currentUser.id)

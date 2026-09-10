@@ -2339,6 +2339,18 @@
         </div>
       </div>
 
+      <!-- Info Tarikh (baca sahaja — hanya kelihatan semasa SUNTING pengguna sedia ada) -->
+      <div id="penggunaInfoTarikh" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3.5 grid grid-cols-2 gap-3 text-xs">
+        <div>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5"><i class="fas fa-user-plus mr-1"></i>Tarikh Daftar</p>
+          <p id="penggunaTarikhDaftar" class="font-semibold text-slate-700">—</p>
+        </div>
+        <div>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5"><i class="fas fa-user-check mr-1"></i>Tarikh Diluluskan</p>
+          <p id="penggunaTarikhDiluluskan" class="font-semibold text-slate-700">—</p>
+        </div>
+      </div>
+
       <div class="flex justify-end gap-3 pt-2 border-t border-slate-100">
         <button type="button" onclick="closeModal('modalPengguna')" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm">Batal</button>
         <button type="submit" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm flex items-center gap-2">
@@ -5933,7 +5945,17 @@ function openModalPengguna(id = null) {
       document.getElementById('penggunaTel').value    = u.tel || '';
       if (selJawatan) selJawatan.value = u.jawatan || '';
       if (selUnit)    selUnit.value    = u.unit    || '';
+
+      // Papar tarikh daftar & diluluskan (baca sahaja) — hanya jika data tersedia
+      const infoTarikhEl = document.getElementById('penggunaInfoTarikh');
+      if (infoTarikhEl) {
+        document.getElementById('penggunaTarikhDaftar').textContent     = u.tarikhDaftar ? _fmtTarikhMasa(new Date(u.tarikhDaftar)) : 'Tiada rekod';
+        document.getElementById('penggunaTarikhDiluluskan').textContent = u.tarikhDiluluskan ? _fmtTarikhMasa(new Date(u.tarikhDiluluskan)) : 'Belum diluluskan';
+        infoTarikhEl.classList.remove('hidden');
+      }
     }
+  } else {
+    document.getElementById('penggunaInfoTarikh')?.classList.add('hidden');
   }
   document.getElementById('modalPengguna').classList.remove('hidden');
 }

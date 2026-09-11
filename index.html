@@ -5643,8 +5643,10 @@ function _bukuSlipCetak(senarai) {
     byPenerima[key].docs.push(d);
   });
 
-  const pages = Object.values(byPenerima).map((grp, gi, arr) => {
-    const isLast = gi === arr.length - 1;
+  // ── Susun TERUS ke bawah (tiada pemisah muka surat dipaksa) — jimat kertas.
+  // page-break-inside:avoid pada setiap kumpulan elak ia terpotong pertengahan
+  // secara janggal antara dua muka surat semasa cetak. ──
+  const kumpulanHTML = Object.values(byPenerima).map(grp => {
     const rows = grp.docs.map((d, i) => `
       <tr>
         <td class="no">${i+1}</td>
@@ -5656,23 +5658,30 @@ function _bukuSlipCetak(senarai) {
         <td class="sub" style="font-size:8pt;color:#4f46e5;font-family:monospace">${d.id}</td>
       </tr>`).join('');
 
-    return `<div${isLast ? '' : ' class="page-break"'}>
-      ${_slipHeaderHTML(tarikhCetak, '')}
-      <div style="font-size:8.5pt;color:#444;margin-bottom:6px;padding:3px 0;border-bottom:1px dashed #cbd5e1;">
-        <b>Kepada:</b> ${grp.penerima} &nbsp;|&nbsp; <b>Tarikh:</b> ${grp.tarikhHantar || tarikhCetak.split(',')[0]} &nbsp;|&nbsp; <b>Jumlah:</b> ${grp.docs.length} dokumen
-      </div>
+    return `<div class="kumpulan-penerima">
+      <div class="kumpulan-tajuk">Kepada: <b>${grp.penerima}</b> <span class="bil-dok">(${grp.docs.length} dokumen &bull; ${grp.tarikhHantar || tarikhCetak.split(',')[0]})</span></div>
       <table class="dok">
         <thead><tr><td class="no">Bil.</td><td style="width:55%">Nama / Perihal Dokumen</td><td>Penghantar Asal</td><td>No. Rujukan</td></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       ${_slipTTDHTML(grp.penyemak, grp.penerima, grp.tarikhHantar || tarikhCetak.split(',')[0])}
-      <div class="nota"><b>NOTA:</b> Sila pastikan penerima menandatangani slip ini sebelum dokumen fizikal diserahkan. Simpan salinan untuk rekod unit.</div>
-      <div class="ft"><span>DDRS 2.0 – Unit Kejururawatan, HTPN</span><span>Dicetak: ${tarikhCetak}</span></div>
     </div>`;
-  }).join('');
+  }).join('<div class="pemisah-kumpulan"></div>');
 
   const html = `<!DOCTYPE html><html lang="ms"><head><meta charset="UTF-8"><title>Slip Penghantaran</title>
-<style>${_slipCSS()}</style></head><body><div class="page-wrap">${pages}</div>
+<style>${_slipCSS()}
+  .kumpulan-penerima{page-break-inside:avoid;margin-bottom:6px;}
+  .kumpulan-tajuk{font-size:9.5pt;font-weight:700;color:#1e3a5f;background:#eef2ff;padding:5px 9px;border-left:3px solid #1e3a5f;margin-bottom:8px;}
+  .kumpulan-tajuk .bil-dok{font-weight:400;color:#64748b;font-size:8.5pt;}
+  .pemisah-kumpulan{border-top:1.5px dashed #cbd5e1;margin:16px 0;}
+</style></head><body>
+<div class="page-wrap">
+  ${_slipHeaderHTML(tarikhCetak, '', 'Slip Penghantaran')}
+  <div style="font-size:7.5pt;color:#777;margin:-6px 0 12px;">Jumlah: ${senarai.length} dokumen &bull; ${Object.keys(byPenerima).length} penerima</div>
+  ${kumpulanHTML}
+  <div class="nota"><b>NOTA:</b> Sila pastikan penerima menandatangani slip ini sebelum dokumen fizikal diserahkan. Simpan salinan untuk rekod unit.</div>
+  <div class="ft"><span>DDRS 2.0 – Unit Kejururawatan, HTPN</span><span>Dicetak: ${tarikhCetak}</span></div>
+</div>
 <script>window.onload=()=>{window.print();};<\/script></body></html>`;
 
   const win = window.open('', '_blank', 'width=860,height=700');

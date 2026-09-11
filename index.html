@@ -4799,6 +4799,17 @@ function renderSemakan() {
     });
   }
 
+  // ── Auto-hilang selepas 3 HARI — untuk status "Dihantar ke USM" DAN "Ditolak".
+  // Status "Disemak" kekal dipaparkan sehingga tindakan diambil (tiada had masa). ──
+  items = items.filter(d => {
+    if (d.status !== 'Dihantar ke USM' && d.status !== 'Ditolak') return true;
+    const isoTarikhSemak = _parseTarikhDDMMYYYY(d.tarikhSemak);
+    if (!isoTarikhSemak) return true; // tidak dapat diparse — selamat, jangan sembunyikan
+    const tarikhSemakDate = new Date(isoTarikhSemak + 'T00:00:00');
+    const hariBerlalu = Math.floor((_hariIniTanpaMasa() - tarikhSemakDate) / 86400000);
+    return hariBerlalu <= 3;
+  });
+
   const container = document.getElementById('listSemakan');
   if (!container) return;
 
@@ -6784,6 +6795,14 @@ function filterSD(f) {
   const ab = document.getElementById(`sdFilter-${f}`);
   if (ab) ab.className = 'sd-filter px-3.5 py-1.5 text-xs font-bold rounded-xl border-2 border-teal-500 bg-teal-600 text-white transition-all flex items-center gap-1.5';
   _renderListSD();
+}
+
+// Pulangkan objek Date untuk HARI INI pada tengah malam (00:00:00) — untuk kiraan
+// beza hari yang tepat & konsisten (elak isu offset akibat masa semasa dalam sehari)
+function _hariIniTanpaMasa() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 function _parseTarikhDDMMYYYY(tarikhStr) {

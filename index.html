@@ -1203,13 +1203,14 @@
                   </div>
                 </div>
                 <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Perihal Dokumen <span class="text-red-500">*</span></label>
-                  <div class="relative">
-                    <i class="fas fa-file-alt absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
-                    <textarea id="dwPerihal" rows="3" placeholder="NYATAKAN PERIHAL DOKUMEN YANG DIDESPATCH..."
-                      oninput="_autoUpper(this)"
-                      class="w-full pl-10 pr-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:border-sky-500 focus:outline-none transition-colors resize-none uppercase"></textarea>
+                  <div class="flex items-center justify-between mb-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Nama Penuh <span class="text-red-500">*</span></label>
+                    <button type="button" onclick="tambahBarisNamaDW()" class="text-xs font-bold text-sky-600 hover:text-sky-700 flex items-center gap-1">
+                      <i class="fas fa-plus-circle"></i> Tambah Nama
+                    </button>
                   </div>
+                  <div id="dwNamaSenarai" class="space-y-2"></div>
+                  <p class="text-[11px] text-slate-400 mt-1.5">Tambah lebih daripada satu nama jika despatch ini melibatkan beberapa kakitangan.</p>
                 </div>
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan <span class="text-slate-400 font-normal normal-case">(pilihan)</span></label>
@@ -2926,46 +2927,11 @@ function _sembunyikanBarMuatan() {
 }
 
 (function _pasangPenunjukMuatanGlobal() {
-  if (typeof google === 'undefined' || !google.script) return;
-  const scriptObj = google.script;
-  const deskriptor = Object.getOwnPropertyDescriptor(scriptObj, 'run');
-  // PENTING: jika 'run' BUKAN getter (nilai tetap, cth mod mock), simpan snapshot
-  // SEKALI sahaja — elak baca semula scriptObj.run selepas ia digantikan (punca gelung tak terhingga)
-  const ambilRunAsal = (deskriptor && deskriptor.get)
-    ? () => deskriptor.get.call(scriptObj)
-    : (() => { const nilaiTetap = scriptObj.run; return () => nilaiTetap; })();
-
-  function bungkusRantai(objRun) {
-    return new Proxy({}, {
-      get(target, prop) {
-        if (prop === 'withSuccessHandler') {
-          return (cb) => bungkusRantai(objRun.withSuccessHandler((...a) => { _sembunyikanBarMuatan(); if (cb) cb(...a); }));
-        }
-        if (prop === 'withFailureHandler') {
-          return (cb) => bungkusRantai(objRun.withFailureHandler((...a) => { _sembunyikanBarMuatan(); if (cb) cb(...a); }));
-        }
-        if (prop === 'withUserObject') {
-          return (...a) => bungkusRantai(objRun.withUserObject(...a));
-        }
-        // Nama fungsi sebenar (titik akhir rantaian) — panggilan sebenar bermula di sini
-        return (...args) => {
-          _tunjukBarMuatan();
-          // Jaringan keselamatan: auto-sembunyi selepas 20 saat walaupun handler tidak dipanggil
-          setTimeout(_sembunyikanBarMuatan, 20000);
-          return objRun[prop](...args);
-        };
-      }
-    });
-  }
-
-  try {
-    Object.defineProperty(scriptObj, 'run', {
-      configurable: true,
-      get() { return bungkusRantai(ambilRunAsal()); }
-    });
-  } catch (e) {
-    // Jika tidak boleh diubah suai (jarang berlaku) — langkau senyap, sistem tetap berfungsi asal
-  }
+  // NOTA: pembalut global (Object.defineProperty ke atas google.script.run) yang
+  // sebelum ini wujud di sini telah DIBUANG — ia berisiko tinggi kerana tidak
+  // pernah diuji terhadap pelayan Apps Script SEBENAR (hanya mod tiruan), dan
+  // disyaki menyebabkan kegagalan panggilan pelayan. Bar muatan kini disambung
+  // terus ke _optimistic() dan _syncNow() sahaja — kaedah yang sudah teruji selamat.
 })();
 
 // ─────────────────────────────────────────────
@@ -3302,9 +3268,10 @@ function initApp() {
 
   // Load semua data serentak (parallel) — jauh lebih laju
   const _gasCall = (fnName, ...args) => new Promise(resolve => {
+    _tunjukBarMuatan();
     google.script.run
-      .withSuccessHandler(resolve)
-      .withFailureHandler(() => resolve(null))
+      .withSuccessHandler((r) => { _sembunyikanBarMuatan(); resolve(r); })
+      .withFailureHandler(() => { _sembunyikanBarMuatan(); resolve(null); })
       [fnName](...args);
   });
 
@@ -3524,9 +3491,10 @@ function _optimistic(localUpdateFn, gasFnName, args, successMsg, successTitle) {
 
   // 2. Sync ke server di latar belakang
   const _call = (fnName, ...a) => new Promise(resolve => {
+    _tunjukBarMuatan();
     google.script.run
-      .withSuccessHandler(resolve)
-      .withFailureHandler(() => resolve(null))
+      .withSuccessHandler((r) => { _sembunyikanBarMuatan(); resolve(r); })
+      .withFailureHandler(() => { _sembunyikanBarMuatan(); resolve(null); })
       [fnName](...a);
   });
 
@@ -3870,6 +3838,53 @@ function _kemaskiniButangBuangNamaSD() {
 
 function _dapatkanSenaraiNamaSD() {
   return [...document.querySelectorAll('#sdNamaSenarai .sd-nama-input')]
+    .map(el => el.value.trim().toUpperCase())
+    .filter(v => v);
+}
+
+// ── Set fungsi BERASINGAN khusus untuk Borang Despatch ke Wad/Unit ──
+let _dwNamaBarisId = 0;
+
+function _dwBarisNamaHTML(idBaris, nilai) {
+  return `
+  <div class="flex items-center gap-2" data-dw-baris-nama="${idBaris}">
+    <div class="relative flex-1">
+      <i class="fas fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+      <input type="text" value="${nilai || ''}" placeholder="NAMA PENUH..." oninput="_autoUpper(this)"
+        class="dw-nama-input w-full pl-9 pr-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-medium uppercase focus:border-sky-500 focus:outline-none transition-colors">
+    </div>
+    <button type="button" onclick="buangBarisNamaDW(${idBaris})"
+      class="dw-nama-buang flex-shrink-0 w-9 h-9 rounded-xl bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors">
+      <i class="fas fa-times text-sm"></i>
+    </button>
+  </div>`;
+}
+
+function tambahBarisNamaDW(nilai) {
+  const container = document.getElementById('dwNamaSenarai');
+  if (!container) return;
+  _dwNamaBarisId++;
+  container.insertAdjacentHTML('beforeend', _dwBarisNamaHTML(_dwNamaBarisId, nilai));
+  _kemaskiniButangBuangNamaDW();
+}
+
+function buangBarisNamaDW(idBaris) {
+  const container = document.getElementById('dwNamaSenarai');
+  const baris = container?.querySelector(`[data-dw-baris-nama="${idBaris}"]`);
+  if (baris) baris.remove();
+  if (container && container.children.length === 0) tambahBarisNamaDW();
+  _kemaskiniButangBuangNamaDW();
+}
+
+function _kemaskiniButangBuangNamaDW() {
+  const container = document.getElementById('dwNamaSenarai');
+  if (!container) return;
+  const bilangan = container.children.length;
+  container.querySelectorAll('.dw-nama-buang').forEach(btn => btn.classList.toggle('hidden', bilangan <= 1));
+}
+
+function _dapatkanSenaraiNamaDW() {
+  return [...document.querySelectorAll('#dwNamaSenarai .dw-nama-input')]
     .map(el => el.value.trim().toUpperCase())
     .filter(v => v);
 }
@@ -6566,6 +6581,10 @@ function renderDespatchWad() {
   const dwPenghantar = document.getElementById('dwPenghantar');
   if (dwPenghantar) dwPenghantar.value = currentUser.name;
 
+  // Pastikan senarai nama ada sekurang-kurangnya satu baris kosong
+  const dwNamaContainer = document.getElementById('dwNamaSenarai');
+  if (dwNamaContainer && dwNamaContainer.children.length === 0) tambahBarisNamaDW();
+
   const dwWad = document.getElementById('dwWadTujuan');
   if (dwWad && document.activeElement !== dwWad) {
     const _isiWad = () => {
@@ -6666,22 +6685,23 @@ function _renderListDespatchWad() {
 
 function hantarDespatchWad() {
   const wadTujuan = document.getElementById('dwWadTujuan')?.value || '';
-  const perihal   = document.getElementById('dwPerihal')?.value.trim() || '';
+  const namaSenarai = _dapatkanSenaraiNamaDW();
   const catatan   = document.getElementById('dwCatatan')?.value.trim() || '-';
   let jenis       = document.getElementById('dwJenisDokumen')?.value || '';
 
   if (!wadTujuan) return toast('error', 'Tidak Lengkap', 'Sila pilih wad/unit tujuan.');
-  if (!perihal)   return toast('error', 'Tidak Lengkap', 'Sila nyatakan perihal dokumen.');
+  if (namaSenarai.length === 0) return toast('error', 'Tidak Lengkap', 'Sila isi sekurang-kurangnya satu nama penuh.');
   if (jenis === 'Lain-lain Dokumen') {
     const jenisLain = document.getElementById('dwJenisDokumenLain')?.value.trim() || '';
     if (!jenisLain) return toast('error', 'Tidak Lengkap', 'Sila nyatakan jenis dokumen.');
     jenis = jenisLain;
   }
 
+  const perihal = _formatSenaraiNama(namaSenarai);
   const now = _fmtTarikhMasa(new Date());
   const data = {
     id: 'DW' + Date.now().toString().slice(-8),
-    wadTujuan, jenisDokumen: jenis || '-', perihal, catatan,
+    wadTujuan, jenisDokumen: jenis || '-', perihal, namaSenarai, catatan,
     namaPenghantar: currentUser.name, idPenghantar: currentUser.id,
     tarikhHantar: now,
   };
@@ -6699,7 +6719,8 @@ function hantarDespatchWad() {
   );
 
   document.getElementById('dwWadTujuan').value = '';
-  document.getElementById('dwPerihal').value = '';
+  const dwNamaContainer = document.getElementById('dwNamaSenarai');
+  if (dwNamaContainer) { dwNamaContainer.innerHTML = ''; tambahBarisNamaDW(); }
   document.getElementById('dwCatatan').value = '';
   document.getElementById('dwJenisDokumen').value = '';
   document.getElementById('dwJenisDokumenCari').value = '';
